@@ -1,0 +1,9 @@
+[submodule "sdk32"]
+	path = sdk32
+	url = https://github.com/danielga/sourcesdk-minimal.git
+[submodule "sdk64"]
+	path = sdk64
+	url = https://github.com/danielga/sourcesdk-minimal.git
+[submodule "luajit"]
+	path = luajit
+	url = https://github.com/eprosync/LuaJIT.git
