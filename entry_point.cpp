@@ -100,7 +100,6 @@ namespace Framework {
         }
     #endif
 
-
     #if defined(__linux__)
         static bool get_page_permissions(void* addr, int& out_prot) {
             std::ifstream maps("/proc/self/maps");
@@ -177,7 +176,7 @@ namespace Framework {
             int current_prot;
             if (!get_page_permissions(reinterpret_cast<void*>(addr_start), current_prot)) return false;
 
-            if (readable)
+            if (writeable)
                 current_prot |= PROT_WRITE;
             else
                 current_prot &= ~PROT_WRITE;
