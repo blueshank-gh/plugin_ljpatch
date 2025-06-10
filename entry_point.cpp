@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <stdio.h>
+#include <unordered_map>
 
 #define NOMINMAX
 #if defined(_WIN32)
@@ -38,39 +39,39 @@ namespace Framework {
     template<typename T>
     T Interface(std::string module, std::string name)
     {
-        #if defined(_WIN32)
-            HMODULE handle = GetModuleHandle(module.c_str());
+    #if defined(_WIN32)
+        HMODULE handle = GetModuleHandle(module.c_str());
 
-            if (!handle)
-                return nullptr;
+        if (!handle)
+            return nullptr;
 
-            static CreateInterface_fn CreateInterface = (CreateInterface_fn)GetProcAddress(handle, "CreateInterface");
+        static CreateInterface_fn CreateInterface = (CreateInterface_fn)GetProcAddress(handle, "CreateInterface");
 
-            if (!CreateInterface)
-                return nullptr;
+        if (!CreateInterface)
+            return nullptr;
 
-            return (T)CreateInterface(name.c_str(), 0);
-        #elif defined(__linux)
-            void* handle = dlopen(module.c_str(), RTLD_LAZY);
-            if (!handle) {
-                return nullptr;
-            }
+        return (T)CreateInterface(name.c_str(), 0);
+    #elif defined(__linux)
+        void* handle = dlopen(module.c_str(), RTLD_LAZY);
+        if (!handle) {
+            return nullptr;
+        }
 
-            CreateInterface_fn CreateInterface = (CreateInterface_fn)dlsym(handle, "CreateInterface");
-            if (!CreateInterface) {
-                dlclose(handle);
-                return nullptr;
-            }
-
-            T result = (T)CreateInterface(name.c_str(), 0);
-
+        CreateInterface_fn CreateInterface = (CreateInterface_fn)dlsym(handle, "CreateInterface");
+        if (!CreateInterface) {
             dlclose(handle);
-            return result;
-        #endif
+            return nullptr;
+        }
+
+        T result = (T)CreateInterface(name.c_str(), 0);
+
+        dlclose(handle);
+        return result;
+    #endif
     }
 
     #ifdef __linux
-        #define UMODULE void*
+    #define UMODULE void*
         static UMODULE mopen(const char* name)
         {
             return dlopen(name, RTLD_LAZY);
@@ -81,7 +82,7 @@ namespace Framework {
             return dlsym(hndle, name);
         }
     #else
-        #define UMODULE HMODULE
+    #define UMODULE HMODULE
         static UMODULE mopen(const char* name)
         {
             return GetModuleHandleA(name);
@@ -93,52 +94,290 @@ namespace Framework {
         }
     #endif
 
-    #if defined(__x86_64__) || defined(_M_X64)
-        std::vector<PLH::x64Detour*>& get_tracking() {
-            static std::vector<PLH::x64Detour*> tracking;
-            return tracking;
-        }
-    #elif defined(__i386__) || defined(_M_IX86)
-        std::vector<PLH::x86Detour*>& get_tracking() {
-            static std::vector<PLH::x86Detour*> tracking;
-            return tracking;
-        }
-    #endif
+    bool is_writable(void* addr) {
+        #if defined(__linux__)
+            int current_prot;
+            if (!get_page_permissions(addr, current_prot)) return false;
+            return (current_prot & PROT_WRITE) == PROT_WRITE;
+        #elif defined(_WIN32)
+            MEMORY_BASIC_INFORMATION mbi;
+            if (VirtualQuery(addr, &mbi, sizeof(mbi)) == 0) return false;
 
-    bool override(void* target, void* hook) {
-        static void* nothing = nullptr;
+            DWORD protect = mbi.Protect;
+            if (protect & PAGE_GUARD || protect & PAGE_NOACCESS) return false;
 
-        #if defined(__x86_64__) || defined(_M_X64)
-            auto detour = new PLH::x64Detour(
-                (uint64_t)target,
-                (uint64_t)hook,
-                (uint64_t*)&nothing
-            );
-        #elif defined(__i386__) || defined(_M_IX86)
-            auto detour = new PLH::x86Detour(
-                (uint64_t)target,
-                (uint64_t)hook,
-                (uint64_t*)&nothing
-            );
+            return (protect & PAGE_READWRITE) || (protect & PAGE_EXECUTE_READWRITE) || (protect & PAGE_WRITECOPY) || (protect & PAGE_EXECUTE_WRITECOPY);
         #endif
-
-        if (!detour->hook()) {
-            detour->unHook();
-            return false;
-        }
-
-        get_tracking().push_back(detour);
-        nothing = nullptr;
-
-        return true;
     }
 
-    void unload() {
-        auto& list = get_tracking();
-        for (auto& entry : list) {
-            entry->unHook();
+    bool is_readable(void* addr) {
+        #if defined(__linux__)
+            int current_prot;
+            if (!get_page_permissions(addr, current_prot)) return false;
+            return (current_prot & PROT_READ) == PROT_READ;
+        #elif defined(_WIN32)
+            MEMORY_BASIC_INFORMATION mbi;
+            if (VirtualQuery(addr, &mbi, sizeof(mbi)) == 0) return false;
+
+            DWORD protect = mbi.Protect;
+            if (protect & PAGE_GUARD || protect & PAGE_NOACCESS) return false;
+
+            return (protect & PAGE_READONLY) || (protect & PAGE_READWRITE) || (protect & PAGE_EXECUTE_READ) || (protect & PAGE_EXECUTE_READWRITE);
+        #endif
+    }
+
+    bool make_writeable(void* addr, bool writeable, size_t size = 1) {
+        #if defined(__linux__)
+            uintptr_t page_size = sysconf(_SC_PAGESIZE);
+            uintptr_t addr_start = reinterpret_cast<uintptr_t>(addr);
+            uintptr_t page_start = addr_start & ~(page_size - 1);
+            uintptr_t page_end = (addr_start + size + page_size - 1) & ~(page_size - 1);
+            size_t total_size = page_end - page_start;
+
+            int current_prot;
+            if (!get_page_permissions(reinterpret_cast<void*>(addr_start), current_prot)) return false;
+
+            if (readable)
+                current_prot |= PROT_WRITE;
+            else
+                current_prot &= ~PROT_WRITE;
+
+            return mprotect(reinterpret_cast<void*>(page_start), total_size, current_prot) == 0;
+        #elif defined(_WIN32)
+            DWORD oldProtect;
+            MEMORY_BASIC_INFORMATION mbi;
+
+            if (VirtualQuery(addr, &mbi, sizeof(mbi)) == 0) return false;
+
+            DWORD newProtect = mbi.Protect;
+
+            if (writeable) {
+                if (newProtect & PAGE_EXECUTE_READ) newProtect = PAGE_EXECUTE_READWRITE;
+                else if (newProtect & PAGE_READONLY) newProtect = PAGE_READWRITE;
+                else if (newProtect & PAGE_EXECUTE) newProtect = PAGE_EXECUTE_READWRITE;
+                else newProtect = PAGE_READWRITE;
+            } else {
+                if (newProtect & PAGE_EXECUTE_READWRITE) newProtect = PAGE_EXECUTE_READ;
+                else if (newProtect & PAGE_READWRITE) newProtect = PAGE_READONLY;
+                else if (newProtect & PAGE_EXECUTE_READWRITE) newProtect = PAGE_EXECUTE_READ;
+                else newProtect = PAGE_READONLY;
+            }
+
+            return VirtualProtect(addr, size, newProtect, &oldProtect) != 0;
+        #endif
+    }
+
+    bool make_readable(void* addr, bool readable, size_t size = 1) {
+        #if defined(__linux__)
+            uintptr_t page_size = sysconf(_SC_PAGESIZE);
+            uintptr_t addr_start = reinterpret_cast<uintptr_t>(addr);
+            uintptr_t page_start = addr_start & ~(page_size - 1);
+            uintptr_t page_end = (addr_start + size + page_size - 1) & ~(page_size - 1);
+            size_t total_size = page_end - page_start;
+
+            int current_prot;
+            if (!get_page_permissions(reinterpret_cast<void*>(addr_start), current_prot)) return false;
+
+            if (readable)
+                current_prot |= PROT_READ;
+            else
+                current_prot &= ~PROT_READ;
+
+            return mprotect(reinterpret_cast<void*>(page_start), total_size, current_prot) == 0;
+        #elif defined(_WIN32)
+            DWORD oldProtect;
+            MEMORY_BASIC_INFORMATION mbi;
+
+            if (VirtualQuery(addr, &mbi, sizeof(mbi)) == 0) return false;
+
+            DWORD newProtect = mbi.Protect;
+
+            if (readable) {
+                if (newProtect & PAGE_EXECUTE) newProtect = PAGE_EXECUTE_READ;
+                else if (newProtect == PAGE_NOACCESS) newProtect = PAGE_READONLY;
+                else if (newProtect & PAGE_READWRITE) newProtect = PAGE_READWRITE;
+                else if (newProtect & PAGE_EXECUTE_READWRITE) newProtect = PAGE_EXECUTE_READWRITE;
+                else newProtect = PAGE_READONLY;
+            } else {
+                if (newProtect & PAGE_READWRITE) newProtect = PAGE_NOACCESS;
+                else if (newProtect & PAGE_READONLY) newProtect = PAGE_NOACCESS;
+                else if (newProtect & PAGE_EXECUTE_READWRITE) newProtect = PAGE_EXECUTE;
+                else if (newProtect & PAGE_EXECUTE_READ) newProtect = PAGE_EXECUTE;
+                else return false;
+            }
+
+            return VirtualProtect(addr, size, newProtect, &oldProtect) != 0;
+        #endif
+    }
+
+    // TODO: make this multi-module compatible
+    namespace Routines {
+        // doing this so that later on if we need any specific signatures, we can expand this.
+        struct routine_data {
+            std::string name; // name of target routine
+            void* routine; // the routine to act as replacement
+            size_t size; // size of the routine (if not provided will not overwrite)
+
+            void* target; // targeted routine
+            std::vector<char> store; // original storage of instructions
+            #if defined(__x86_64__) || defined(_M_X64)
+                PLH::x64Detour* hook; // hook storage of routine
+            #elif defined(__i386__) || defined(_M_IX86)
+                PLH::x86Detour* hook; // hook storage of routine
+            #endif
+        };
+
+        std::vector<routine_data*>& get_routines() {
+            static std::vector<routine_data*> routines = std::vector<routine_data*>();
+            return routines;
         }
-        list.clear();
+
+        std::unordered_map<std::string, routine_data*>& get_routines_cache() {
+            static std::unordered_map<std::string, routine_data*> mappings = std::unordered_map<std::string, routine_data*>();
+            return mappings;
+        }
+
+        size_t count()
+        {
+            return get_routines().size();
+        }
+
+        void add(std::string name, void* routine, size_t size = 0)
+        {
+            auto& cache = get_routines_cache();
+
+            if (cache.find(name) != cache.end()) {
+                routine_data* data = cache[name];
+                data->name = name;
+                data->routine = routine;
+                data->size = size;
+                return;
+            }
+
+            routine_data* data = new routine_data();
+            data->name = name;
+            data->routine = routine;
+            data->size = size;
+            data->target = nullptr;
+            data->store = std::vector<char>();
+            data->hook = nullptr;
+
+            auto& routines = get_routines();
+            cache.emplace(name, data);
+            routines.push_back(data);
+        }
+
+        bool override(void* target, routine_data* data) {
+            static void* nothing = nullptr;
+
+            #if defined(__x86_64__) || defined(_M_X64)
+                auto detour = new PLH::x64Detour(
+                    (uint64_t)target,
+                    (uint64_t)data->routine,
+                    (uint64_t*)&nothing
+                );
+            #elif defined(__i386__) || defined(_M_IX86)
+                auto detour = new PLH::x86Detour(
+                    (uint64_t)target,
+                    (uint64_t)data->routine,
+                    (uint64_t*)&nothing
+                );
+            #endif
+
+            if (!detour->hook()) {
+                detour->unHook();
+                return false;
+            }
+
+            data->hook = detour;
+            nothing = nullptr;
+
+            return true;
+        }
+
+        // only use this if polyhook fails
+        // this overwrites the whole function by replacing every instruction
+        // last resort as we cannot accurately determine if we are overwriting into other sections
+        // and also if its offset based stuff we are kinda screwed
+        bool overwrite(void* target, routine_data* data, size_t size) {
+            bool writeable = Framework::is_writable(target);
+
+            if (!writeable) {
+                if (!Framework::make_writeable(target, true, size)) {
+                    return false;
+                }
+            }
+
+            std::memcpy(target, data->routine, size);
+
+            if (!writeable) {
+                Framework::make_writeable(target, false, size);
+            }
+
+            return true;
+        }
+
+        size_t load(UMODULE module)
+        {
+            size_t count = 0;
+            auto& routines = get_routines();
+            for (auto& entry : routines) {
+                void* target = Framework::n2p(module, entry->name.c_str());
+                if (target == nullptr) {
+                    std::cout << "[LJPatch] [WARNING] Couldn't locate " << entry->name << "!" << std::endl;
+                }
+                else if (!override(target, entry)) {
+                    if (entry->size > 0) {
+                        std::cout << "[LJPatch] [WARNING] Couldn't modify " << entry->name << ", resorting to overwrite!" << std::endl;
+                        for (unsigned int i = 0; i < entry->size; ++i) {
+                            entry->store.push_back(((char*)entry->routine)[i]);
+                        }
+                        if (!overwrite(target, entry, entry->size)) {
+                            std::cout << "[LJPatch] [WARNING] Couldn't overwrite " << entry->name << "!" << std::endl;
+                        }
+                        else {
+                            count++;
+                        }
+                    }
+                    else {
+                        std::cout << "[LJPatch] [WARNING] Couldn't modify " << entry->name << "!" << std::endl;
+                    }
+                }
+                else {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        void unload()
+        {
+            auto& list = get_routines();
+            for (auto& entry : list) {
+                if (entry->hook) {
+                    entry->hook->unHook();
+                    delete entry->hook;
+                    entry->hook = nullptr;
+                }
+                else if (entry->size > 0 && entry->store.size() > 0) {
+                    bool writeable = Framework::is_writable(entry->target);
+
+                    if (!writeable) {
+                        Framework::make_writeable(entry->target, true, entry->size);
+                    }
+
+                    for (unsigned int i = 0; i < entry->size; ++i) {
+                        ((char*)entry->target)[i] = entry->store[i];
+                    }
+
+                    if (!writeable) {
+                        Framework::make_writeable(entry->target, false, entry->size);
+                    }
+
+                    entry->store.clear();
+                }
+            }
+        }
     }
 }
 
@@ -320,151 +559,171 @@ bool LJPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn g
     std::cout << std::endl;
     std::cout << "Rolling Back LuaJIT & Feature Restoration" << std::endl;
 
-    std::vector<std::pair<std::string, void*>> apis = {
-        { "luaJIT_setmode", luaJIT_setmode },
+    std::cout << "[LJPatch] Adding Registry..." << std::endl;
+    {
+        using Framework::Routines::add;
 
-        { "luaopen_base", luaopen_base },
-        { "luaopen_bit", luaopen_bit },
-        { "luaopen_debug", luaopen_debug },
-        { "luaopen_jit", luaopen_jit },
-        { "luaopen_math", luaopen_math },
-        { "luaopen_os", luaopen_os },
-        { "luaopen_package", luaopen_package },
-        { "luaopen_string", luaopen_string },
-        { "luaopen_table", luaopen_table },
+        add("luaJIT_setmode", luaJIT_setmode);
 
-        { "luaL_addlstring", luaL_addlstring },
-        { "luaL_addstring", luaL_addstring },
-        { "luaL_addvalue", luaL_addvalue },
-        { "luaL_argerror", luaL_argerror },
-        { "luaL_buffinit", luaL_buffinit },
-        { "luaL_callmeta", luaL_callmeta },
-        { "luaL_checkany", luaL_checkany },
-        { "luaL_checkinteger", luaL_checkinteger },
-        { "luaL_checklstring", luaL_checklstring },
-        { "luaL_checknumber", luaL_checknumber },
-        { "luaL_checkoption", luaL_checkoption },
-        { "luaL_checkstack", luaL_checkstack },
-        { "luaL_checktype", luaL_checktype },
-        { "luaL_checkudata", luaL_checkudata },
-        { "luaL_error", luaL_error },
-        { "luaL_execresult", luaL_execresult },
-        { "luaL_fileresult", luaL_fileresult },
-        { "luaL_findtable", luaL_findtable },
-        { "luaL_getmetafield", luaL_getmetafield },
-        { "luaL_gsub", luaL_gsub },
-        { "luaL_loadbuffer", luaL_loadbuffer },
-        { "luaL_loadbufferx", luaL_loadbufferx },
-        { "luaL_loadfile", luaL_loadfile },
-        { "luaL_loadfilex", luaL_loadfilex },
-        { "luaL_loadstring", luaL_loadstring },
-        { "luaL_newmetatable", luaL_newmetatable },
-        { "luaL_newstate", luaL_newstate },
-        { "luaL_openlib", luaL_openlib },
-        { "luaL_openlibs", luaL_openlibs_dt },
-        { "luaL_optinteger", luaL_optinteger },
-        { "luaL_optlstring", luaL_optlstring },
-        { "luaL_optnumber", luaL_optnumber },
-        { "luaL_prepbuffer", luaL_prepbuffer },
-        { "luaL_pushmodule", luaL_pushmodule },
-        { "luaL_pushresult", luaL_pushresult },
-        { "luaL_ref", luaL_ref },
-        { "luaL_register", luaL_register },
-        { "luaL_setfuncs", luaL_setfuncs },
-        { "luaL_setmetatable", luaL_setmetatable },
-        { "luaL_testudata", luaL_testudata },
-        { "luaL_traceback", luaL_traceback },
-        { "luaL_typerror", luaL_typerror },
-        { "luaL_unref", luaL_unref },
-        { "luaL_where", luaL_where },
+        add("luaopen_base", luaopen_base);
+        add("luaopen_bit", luaopen_bit);
+        add("luaopen_debug", luaopen_debug);
+        add("luaopen_jit", luaopen_jit);
+        add("luaopen_math", luaopen_math);
+        add("luaopen_os", luaopen_os);
+        add("luaopen_package", luaopen_package);
+        add("luaopen_string", luaopen_string);
+        add("luaopen_table", luaopen_table);
 
-        { "lua_atpanic", lua_atpanic },
-        { "lua_call", lua_call },
-        { "lua_checkstack", lua_checkstack },
-        { "lua_close", lua_close },
-        { "lua_concat", lua_concat },
-        { "lua_copy", lua_copy },
-        { "lua_cpcall", lua_cpcall },
-        { "lua_createtable", lua_createtable },
-        { "lua_dump", lua_dump },
-        { "lua_equal", lua_equal },
-        { "lua_error", lua_error },
-        { "lua_gc", lua_gc },
-        { "lua_getallocf", lua_getallocf },
-        { "lua_getfenv", lua_getfenv },
-        { "lua_getfield", lua_getfield },
-        { "lua_gethook", lua_gethook },
-        { "lua_gethookcount", lua_gethookcount },
-        { "lua_gethookmask", lua_gethookmask },
-        { "lua_getinfo", lua_getinfo },
-        { "lua_getlocal", lua_getlocal },
-        { "lua_getmetatable", lua_getmetatable },
-        { "lua_getstack", lua_getstack },
-        { "lua_gettable", lua_gettable },
-        { "lua_gettop", lua_gettop },
-        { "lua_getupvalue", lua_getupvalue },
-        { "lua_insert", lua_insert },
-        { "lua_iscfunction", lua_iscfunction },
-        { "lua_isnumber", lua_isnumber },
-        { "lua_isstring", lua_isstring },
-        { "lua_isuserdata", lua_isuserdata },
-        { "lua_isyieldable", lua_isyieldable },
-        { "lua_lessthan", lua_lessthan },
-        { "lua_load", lua_load },
-        { "lua_loadx", lua_loadx },
-        { "lua_newstate", lua_newstate },
-        { "lua_newthread", lua_newthread },
-        { "lua_newuserdata", lua_newuserdata },
-        { "lua_next", lua_next },
-        { "lua_objlen", lua_objlen },
-        { "lua_pcall", lua_pcall },
-        { "lua_pushboolean", lua_pushboolean },
-        { "lua_pushcclosure", lua_pushcclosure },
-        { "lua_pushfstring", lua_pushfstring },
-        { "lua_pushinteger", lua_pushinteger },
-        { "lua_pushlightuserdata", lua_pushlightuserdata },
-        { "lua_pushlstring", lua_pushlstring },
-        { "lua_pushnil", lua_pushnil },
-        { "lua_pushnumber", lua_pushnumber },
-        { "lua_pushstring", lua_pushstring },
-        { "lua_pushthread", lua_pushthread },
-        { "lua_pushvalue", lua_pushvalue },
-        { "lua_pushvfstring", lua_pushvfstring },
-        { "lua_rawequal", lua_rawequal },
-        { "lua_rawget", lua_rawget },
-        { "lua_rawgeti", lua_rawgeti },
-        { "lua_rawset", lua_rawset },
-        { "lua_rawseti", lua_rawseti },
-        { "lua_remove", lua_remove },
-        { "lua_replace", lua_replace },
-        { "lua_setallocf", lua_setallocf },
-        { "lua_setfenv", lua_setfenv },
-        { "lua_setfield", lua_setfield },
-        { "lua_sethook", lua_sethook },
-        { "lua_setlocal", lua_setlocal },
-        { "lua_setmetatable", lua_setmetatable },
-        { "lua_settable", lua_settable },
-        { "lua_settop", lua_settop },
-        { "lua_setupvalue", lua_setupvalue },
-        { "lua_status", lua_status },
-        { "lua_toboolean", lua_toboolean },
-        { "lua_tocfunction", lua_tocfunction },
-        { "lua_tointeger", lua_tointeger },
-        { "lua_tointegerx", lua_tointegerx },
-        { "lua_tolstring", lua_tolstring },
-        { "lua_tonumber", lua_tonumber },
-        { "lua_tonumberx", lua_tonumberx },
-        { "lua_topointer", lua_topointer },
-        { "lua_tothread", lua_tothread },
-        { "lua_touserdata", lua_touserdata },
-        { "lua_type", lua_type },
-        { "lua_typename", lua_typename },
-        { "lua_upvalueid", lua_upvalueid },
-        { "lua_upvaluejoin", lua_upvaluejoin },
-        { "lua_version", lua_version },
-        { "lua_xmove", lua_xmove },
-        { "lua_yield", lua_yield }
-    };
+        add("luaL_addlstring", luaL_addlstring);
+        add("luaL_addstring", luaL_addstring);
+        add("luaL_addvalue", luaL_addvalue);
+        add("luaL_argerror", luaL_argerror);
+        add("luaL_buffinit", luaL_buffinit);
+        add("luaL_callmeta", luaL_callmeta);
+        add("luaL_checkany", luaL_checkany);
+        add("luaL_checkinteger", luaL_checkinteger);
+        add("luaL_checklstring", luaL_checklstring);
+        add("luaL_checknumber", luaL_checknumber);
+        add("luaL_checkoption", luaL_checkoption);
+        add("luaL_checkstack", luaL_checkstack);
+        add("luaL_checktype", luaL_checktype);
+        add("luaL_checkudata", luaL_checkudata);
+        add("luaL_error", luaL_error);
+        add("luaL_execresult", luaL_execresult);
+        add("luaL_fileresult", luaL_fileresult);
+        add("luaL_findtable", luaL_findtable);
+        add("luaL_getmetafield", luaL_getmetafield);
+        add("luaL_gsub", luaL_gsub);
+        add("luaL_loadbuffer", luaL_loadbuffer);
+        add("luaL_loadbufferx", luaL_loadbufferx);
+        add("luaL_loadfile", luaL_loadfile);
+        add("luaL_loadfilex", luaL_loadfilex);
+        add("luaL_loadstring", luaL_loadstring);
+        add("luaL_newmetatable", luaL_newmetatable);
+        add("luaL_newstate", luaL_newstate);
+        add("luaL_openlib", luaL_openlib);
+        add("luaL_openlibs", luaL_openlibs_dt);
+        add("luaL_optinteger", luaL_optinteger);
+        add("luaL_optlstring", luaL_optlstring);
+        add("luaL_optnumber", luaL_optnumber);
+        add("luaL_prepbuffer", luaL_prepbuffer);
+        add("luaL_pushmodule", luaL_pushmodule);
+        add("luaL_pushresult", luaL_pushresult);
+        add("luaL_ref", luaL_ref);
+        add("luaL_register", luaL_register);
+        add("luaL_setfuncs", luaL_setfuncs);
+        add("luaL_setmetatable", luaL_setmetatable);
+        add("luaL_testudata", luaL_testudata);
+        add("luaL_traceback", luaL_traceback);
+        add("luaL_typerror", luaL_typerror);
+        add("luaL_unref", luaL_unref);
+        add("luaL_where", luaL_where);
+
+        add("lua_atpanic", lua_atpanic);
+        add("lua_call", lua_call);
+        add("lua_checkstack", lua_checkstack);
+        add("lua_close", lua_close);
+        add("lua_concat", lua_concat);
+        add("lua_copy", lua_copy);
+        add("lua_cpcall", lua_cpcall);
+        add("lua_createtable", lua_createtable);
+        add("lua_dump", lua_dump);
+        add("lua_equal", lua_equal);
+        add("lua_error", lua_error);
+        add("lua_gc", lua_gc);
+        add("lua_getallocf", lua_getallocf);
+        add("lua_getfenv", lua_getfenv);
+        add("lua_getfield", lua_getfield);
+        add("lua_gethook", lua_gethook);
+        add("lua_gethookcount", lua_gethookcount);
+        add("lua_gethookmask", lua_gethookmask);
+        add("lua_getinfo", lua_getinfo);
+        add("lua_getlocal", lua_getlocal);
+        add("lua_getmetatable", lua_getmetatable);
+        add("lua_getstack", lua_getstack);
+        add("lua_gettable", lua_gettable);
+        add("lua_gettop", lua_gettop);
+        add("lua_getupvalue", lua_getupvalue);
+        add("lua_insert", lua_insert);
+        add("lua_iscfunction", lua_iscfunction);
+        add("lua_isnumber", lua_isnumber);
+        add("lua_isstring", lua_isstring);
+        add("lua_isuserdata", lua_isuserdata);
+        add("lua_isyieldable", lua_isyieldable);
+        add("lua_lessthan", lua_lessthan);
+        add("lua_load", lua_load);
+        add("lua_loadx", lua_loadx);
+        add("lua_newstate", lua_newstate);
+        add("lua_newthread", lua_newthread);
+        add("lua_newuserdata", lua_newuserdata);
+        add("lua_next", lua_next);
+        add("lua_objlen", lua_objlen);
+        add("lua_pcall", lua_pcall);
+        add("lua_pushboolean", lua_pushboolean);
+        add("lua_pushcclosure", lua_pushcclosure);
+        add("lua_pushfstring", lua_pushfstring);
+        add("lua_pushinteger", lua_pushinteger);
+        add("lua_pushlightuserdata", lua_pushlightuserdata);
+        add("lua_pushlstring", lua_pushlstring);
+        add("lua_pushnil", lua_pushnil);
+        add("lua_pushnumber", lua_pushnumber);
+        add("lua_pushstring", lua_pushstring);
+        add("lua_pushthread", lua_pushthread);
+        add("lua_pushvalue", lua_pushvalue);
+        add("lua_pushvfstring", lua_pushvfstring);
+        add("lua_rawequal", lua_rawequal);
+        add("lua_rawget", lua_rawget);
+        add("lua_rawgeti", lua_rawgeti);
+        add("lua_rawset", lua_rawset);
+        add("lua_rawseti", lua_rawseti);
+        add("lua_remove", lua_remove);
+        add("lua_replace", lua_replace);
+        add("lua_setallocf", lua_setallocf);
+        add("lua_setfenv", lua_setfenv);
+        add("lua_setfield", lua_setfield);
+        add("lua_sethook", lua_sethook);
+        add("lua_setlocal", lua_setlocal);
+        add("lua_setmetatable", lua_setmetatable);
+        add("lua_settable", lua_settable);
+        add("lua_settop", lua_settop);
+        add("lua_setupvalue", lua_setupvalue);
+        add("lua_status", lua_status);
+        add("lua_toboolean", lua_toboolean);
+        add("lua_tocfunction", lua_tocfunction);
+        add("lua_tointeger", lua_tointeger);
+        add("lua_tointegerx", lua_tointegerx);
+        add("lua_tolstring", lua_tolstring);
+        add("lua_tonumber", lua_tonumber);
+        add("lua_tonumberx", lua_tonumberx);
+        add("lua_topointer", lua_topointer);
+        add("lua_tothread", lua_tothread);
+        add("lua_touserdata", lua_touserdata);
+        add("lua_type", lua_type);
+        add("lua_typename", lua_typename);
+        add("lua_upvalueid", lua_upvalueid);
+        add("lua_upvaluejoin", lua_upvaluejoin);
+        add("lua_version", lua_version);
+        add("lua_xmove", lua_xmove);
+        add("lua_yield", lua_yield);
+
+        // Linux x64 PLH incompatibility:
+        // lua_isuserdata, lua_toboolean, lua_tocfunction, lua_tothread, lua_touserdata
+        #if defined(__linux) && (defined(__x86_64__) || defined(_M_X64))
+            add("lua_isuserdata", lua_isuserdata, 0x1D);
+            add("lua_toboolean", lua_toboolean, 0x15);
+            add("lua_tocfunction", lua_tocfunction, 0x47);
+            add("lua_tothread", lua_tothread, 0x23);
+            add("lua_isyieldable", lua_touserdata, 0x41);
+        #endif
+
+        // Windows x64 PLH incompatibility:
+        // lua_status, lua_isyieldable
+        #if defined(_WIN32) && (defined(__x86_64__) || defined(_M_X64))
+            add("lua_status", lua_status, 0x4);
+            add("lua_isyieldable", lua_isyieldable, 0x6);
+        #endif
+    }
 
     #ifdef BINARY2
         const char* binary = BINARY2;
@@ -490,19 +749,9 @@ bool LJPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn g
         return 0;
     }
 
-    size_t count = 0;
     std::cout << "[LJPatch] Patching..." << std::endl;
-    for (const auto& entry : apis) {
-        void* target = Framework::n2p(lua_shared, entry.first.c_str());
-        if (target == nullptr) {
-            std::cout << "[LJPatch] [WARNING] Couldn't locate " << entry.first << "!" << std::endl;
-        } else if (!Framework::override(target, entry.second)) {
-            std::cout << "[LJPatch] [WARNING] Couldn't modify " << entry.first << "!" << std::endl;
-        } else {
-            count++;
-        }
-    }
-    std::cout << "[LJPatch] Restored: " << count << " / " << apis.size() << " APIs" << std::endl;
+    size_t count = Framework::Routines::load(lua_shared);
+    std::cout << "[LJPatch] Restored: " << count << " / " << Framework::Routines::count() << " APIs" << std::endl;
 
     return true;
 }
@@ -513,7 +762,7 @@ bool LJPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn g
 void LJPatchPlugin::Unload(void)
 {
     std::cout << "[LJPatch] Unloading..." << std::endl;
-    Framework::unload();
+    Framework::Routines::unload();
     std::cout << "[LJPatch] Complete." << std::endl;
 }
 
