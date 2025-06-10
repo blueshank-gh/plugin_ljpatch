@@ -11,10 +11,9 @@ This restores dangerous API's such as FFI to LuaJIT, you have been warned.
 
 ## Checklist
 - [x] Windows - x64 Support
-  - Warnings from lua_isyieldable & lua_status
 - [ ] Windows - x86 Support
   - Failures from lua_shared.dll
 - [ ] Linux - x64 Support
-  - Failures from lua_isuserdata, lua_toboolean, lua_tocfunction, lua_tothread, lua_touserdata
+  - Failures from infinite recursion (polyhook2), looking for alternatives atm...
 - [ ] Linux - x86 Support
   - Failures from lua_shared.dll
