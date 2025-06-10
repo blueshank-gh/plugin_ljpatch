@@ -39,6 +39,7 @@ workspace "plugin_ljpatch32"
     location "build"
     characterset "MBCS"
     staticruntime "on"
+    pic "On"
 
     filter "platforms:x86"
         architecture "x86"
@@ -76,7 +77,7 @@ workspace "plugin_ljpatch32"
         filter { "system:linux", "platforms:x86" }
             links { "luajit/src/luajit" }
             prebuildcommands {
-                "cd ../luajit/src && make clean && make CC=\"gcc -m32\" BUILDMODE=static LUAJIT_ENABLE_LUA52=0 BUILD_SHARED_LIBS=OFF"
+                "cd ../luajit/src && make clean && make CC=\"gcc -m32 -fPIC\" BUILDMODE=static LUAJIT_ENABLE_LUA52=0 BUILD_SHARED_LIBS=OFF"
             }
 
         filter { "system:windows", "platforms:x86" }
@@ -94,9 +95,7 @@ workspace "plugin_ljpatch32"
                 targetname ("plugin_ljpatch_win32")
 
         filter "system:linux"
-            links {
-                "polyhook2", "tier0", "tier1"
-            }
+            links { "PolyHook_2" }
             defines { "COMPILER_GCC" }
 
             filter { "system:linux", "platforms:x86" }
@@ -114,6 +113,7 @@ workspace "plugin_ljpatch64"
     location "build"
     characterset "MBCS"
     staticruntime "on"
+    pic "On"
 
     filter "platforms:x64"
         architecture "x86_64"
@@ -151,7 +151,7 @@ workspace "plugin_ljpatch64"
         filter { "system:linux", "platforms:x64" }
             links { "luajit/src/luajit" }
             prebuildcommands {
-                "cd ../luajit/src && make clean && make CC=\"gcc -m64\" XCFLAGS=\"-DLUAJIT_ENABLE_GC64\" BUILDMODE=static LUAJIT_ENABLE_LUA52=0 BUILD_SHARED_LIBS=OFF"
+                "cd ../luajit/src && make clean && make CC=\"gcc -m64 -fPIC\" XCFLAGS=\"-DLUAJIT_ENABLE_GC64\" BUILDMODE=static LUAJIT_ENABLE_LUA52=0 BUILD_SHARED_LIBS=OFF"
             }
 
         filter { "system:windows", "platforms:x64" }
@@ -169,9 +169,7 @@ workspace "plugin_ljpatch64"
                 targetname ("plugin_ljpatch_win64")
 
         filter "system:linux"
-            links {
-                "polyhook2", "tier0", "tier1"
-            }
+            links { "PolyHook_2" }
             defines { "COMPILER_GCC" }
 
             filter { "system:linux", "platforms:x64" }
