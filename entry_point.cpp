@@ -9,8 +9,6 @@
 
 #define NOMINMAX
 #if defined(_WIN32)
-#include <psapi.h>
-#include <iostream>
 #include <windows.h>
 #elif defined(__linux)
 #include <dlfcn.h>
