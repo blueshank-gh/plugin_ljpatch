@@ -9,10 +9,16 @@
 
 #define NOMINMAX
 #if defined(_WIN32)
+#include <psapi.h>
+#include <iostream>
 #include <windows.h>
-#elif defined(__linux__)
+#elif defined(__linux)
 #include <dlfcn.h>
 #include <sys/mman.h>
+#include <unistd.h>
+#include <link.h>
+#include <cstddef>
+#include <stdint.h>
 #endif
 
 #pragma comment (lib, "../luajit/src/lua51.lib")
