@@ -100,6 +100,40 @@ namespace Framework {
         }
     #endif
 
+
+    #if defined(__linux__)
+        static bool get_page_permissions(void* addr, int& out_prot) {
+            std::ifstream maps("/proc/self/maps");
+            if (!maps.is_open()) return false;
+
+            std::string line;
+            uintptr_t target = reinterpret_cast<uintptr_t>(addr);
+
+            while (std::getline(maps, line)) {
+                uintptr_t start, end;
+                char perms[5] = {0};
+
+                std::istringstream iss(line);
+                iss >> std::hex >> start;
+                iss.ignore(1);
+                iss >> std::hex >> end;
+                iss >> perms;
+
+                if (target >= start && target < end) {
+                    int prot = 0;
+                    if (perms[0] == 'r') prot |= PROT_READ;
+                    if (perms[1] == 'w') prot |= PROT_WRITE;
+                    if (perms[2] == 'x') prot |= PROT_EXEC;
+
+                    out_prot = prot;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    #endif
+
     bool is_writable(void* addr) {
         #if defined(__linux__)
             int current_prot;
