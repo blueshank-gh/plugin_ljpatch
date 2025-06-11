@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 #include <memory>
@@ -321,8 +322,9 @@ namespace Framework {
                 );
             #endif
 
-            if (!detour->hook()) {
+            if (!detour->hook() || !detour->isHooked()) {
                 detour->unHook();
+                delete detour;
                 return false;
             }
 
@@ -333,9 +335,56 @@ namespace Framework {
         }
 
         // only use this if polyhook fails
-        // this overwrites the whole function by replacing every instruction
-        // last resort as we cannot accurately determine if we are overwriting into other sections
-        // and also if its offset based stuff we are kinda screwed
+        // this inserts a jmp right at the start of a function.
+        // now this can fail very easily and cause corruption, depending on returns and etc
+        bool redirect(void* target, routine_data* data)
+        {
+            bool writeable = Framework::is_writable(target);
+
+            if (!writeable) {
+                if (!Framework::make_writeable(target, true)) {
+                    return false;
+                }
+            }
+
+            #if defined(__x86_64__) || defined(_M_X64)
+                // SIZE: 12
+                // mov rax, imm64 -> 48 B8 XX XX XX XX XX XX XX XX
+                // jmp rax -> FF E0
+                char* buffer = (char*)target;
+                for (unsigned int i = 0; i < 12; ++i) {
+                    data->store.push_back(buffer[i]);
+                }
+                buffer[0] = 0x48; buffer[1] = 0xB8;
+                *(void**)(buffer + 2) = data->routine;
+                buffer[10] = 0xFF; buffer[11] = 0xE0;
+            #elif defined(__i386__) || defined(_M_IX86)
+                // SIZE: 5
+                // jmp -> E9 XX XX XX XX (offset from PC)
+                char* buffer = (char*)target;
+                for (unsigned int i = 0; i < 5; ++i) {
+                    data->store.push_back(buffer[i]);
+                }
+                buffer[0] = 0xE9;
+                intptr_t relative = (intptr_t)(data->routine) - ((intptr_t)buffer + 5);
+                *(int32_t*)(buffer + 1) = (int32_t)relative;
+            #endif
+
+            #ifdef __linux
+                __builtin___clear_cache(buffer, buffer + 16);
+            #endif
+
+            if (!writeable) {
+                Framework::make_writeable(target, false);
+            }
+
+            return true;
+        }
+
+        // only use this if polyhook fails
+        // this overwrites the whole function by replacing every instruction.
+        // last resort as we cannot accurately determine if we are overwriting into other sections.
+        // and also if its offset based stuff we are kinda screwed (as we need to calculate the offset relatives).
         bool overwrite(void* target, routine_data* data, size_t size) {
             bool writeable = Framework::is_writable(target);
 
@@ -345,7 +394,12 @@ namespace Framework {
                 }
             }
 
-            std::memcpy(target, data->routine, size);
+            // TODO: using Zydis we should re-eval offsets like call operators
+
+            for (unsigned int i = 0; i < size; ++i) {
+                data->store.push_back(((unsigned char*)target)[i]);
+                ((unsigned char*)target)[i] = ((unsigned char*)data->routine)[i];
+            }
 
             if (!writeable) {
                 Framework::make_writeable(target, false, size);
@@ -364,23 +418,18 @@ namespace Framework {
                 if (target == nullptr) {
                     std::cout << "[LJPatch] [WARNING] Couldn't locate " << entry->name << "!" << std::endl;
                 }
-                else if (!override(target, entry)) {
-                    if (entry->size > 0) {
-                        std::cout << "[LJPatch] [WARNING] Couldn't modify " << entry->name << ", resorting to overwrite!" << std::endl;
-                        for (unsigned int i = 0; i < entry->size; ++i) {
-                            entry->store.push_back(((char*)entry->routine)[i]);
-                        }
-                        if (!overwrite(target, entry, entry->size)) {
-                            std::cout << "[LJPatch] [WARNING] Couldn't overwrite " << entry->name << "!" << std::endl;
-                        }
-                        else {
-                            count++;
-                        }
+                else if (!redirect(target, entry)) {
+                    std::cout << "[LJPatch] [ERROR] Couldn't redirect " << entry->name << "!" << std::endl;
+                }
+                /*else if (!override(target, entry)) {
+                    std::cout << "[LJPatch] [WARNING] Couldn't modify " << entry->name << ", resorting to redirect!" << std::endl;
+                    if (!redirect(target, entry)) {
+                        std::cout << "[LJPatch] [ERROR] Couldn't redirect " << entry->name << "!" << std::endl;
                     }
                     else {
-                        std::cout << "[LJPatch] [WARNING] Couldn't modify " << entry->name << "!" << std::endl;
+                        count++;
                     }
-                }
+                }*/
                 else {
                     count++;
                 }
@@ -398,19 +447,21 @@ namespace Framework {
                         delete entry->hook;
                         entry->hook = nullptr;
                     }
-                    else if (entry->size > 0 && entry->store.size() > 0) {
+                    else if (entry->store.size() > 0) {
+                        size_t sz = entry->store.size();
+
                         bool writeable = Framework::is_writable(entry->target);
 
                         if (!writeable) {
-                            Framework::make_writeable(entry->target, true, entry->size);
+                            Framework::make_writeable(entry->target, true, sz);
                         }
 
-                        for (unsigned int i = 0; i < entry->size; ++i) {
+                        for (size_t i = 0; i < sz; ++i) {
                             ((char*)entry->target)[i] = entry->store[i];
                         }
 
                         if (!writeable) {
-                            Framework::make_writeable(entry->target, false, entry->size);
+                            Framework::make_writeable(entry->target, false, sz);
                         }
 
                         entry->store.clear();
@@ -939,21 +990,6 @@ bool LJPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn g
         add("lua_version", (void*)lua_version_dt);
         add("lua_xmove", (void*)lua_xmove_dt);
         add("lua_yield", (void*)lua_yield_dt);
-
-        // Linux x64 PLH incompatibility:
-        // lua_touserdata, lua_tothread, lua_tocfunction
-        #if defined(__linux) && (defined(__x86_64__) || defined(_M_X64))
-            add("lua_touserdata", (void*)lua_touserdata_dt, 0x22);
-            add("lua_tothread", (void*)lua_tothread_dt, 0x22);
-            add("lua_tocfunction", (void*)lua_tocfunction_dt, 0x22);
-        #endif
-
-        // Windows x64 PLH incompatibility:
-        // lua_status, lua_isyieldable
-        #if defined(_WIN32) && (defined(__x86_64__) || defined(_M_X64))
-            add("lua_status", (void*)lua_status_dt, 0x1); // its just a jmp...
-            add("lua_isyieldable", (void*)lua_isyieldable_dt, 0x36);
-        #endif
     }
 
     #ifdef BINARY2
