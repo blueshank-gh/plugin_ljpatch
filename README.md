@@ -16,5 +16,6 @@ This restores dangerous API's such as FFI to LuaJIT, you have been warned.
 - [ ] Linux - x64 Support
   - Failures from CBaseLuaInterface::GetType
   - On case 7u (userdata), *a1 + 216LL (CBaseLuaInterface::GetUserData) is null (this really shouldn't happen...)
+  - Find this function @ lua_shared.so + 0x1FA20
 - [ ] Linux - x86 Support
   - Failures from lua_shared.dll
