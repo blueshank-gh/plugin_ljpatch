@@ -14,6 +14,7 @@ This restores dangerous API's such as FFI to LuaJIT, you have been warned.
 - [ ] Windows - x86 Support
   - Failures from lua_shared.dll
 - [ ] Linux - x64 Support
-  - Failures from infinite recursion (polyhook2), looking for alternatives atm...
+  - Failures from CBaseLuaInterface::GetType
+  - On case 7u (userdata), *a1 + 216LL (CBaseLuaInterface::GetUserData) is null (this really shouldn't happen...)
 - [ ] Linux - x86 Support
   - Failures from lua_shared.dll
