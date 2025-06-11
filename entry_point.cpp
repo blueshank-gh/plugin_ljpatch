@@ -720,11 +720,6 @@ namespace Overrides {
 
 bool LJPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameServerFactory)
 {
-    std::cout << "[DEBUG] Hi, this is here for debugging, later releases won't have this.\n";
-    std::cout << "[DEBUG] You should attach a debugger here, like GDB or WINDBG.\n";
-    std::cout << "[DEBUG] Press Enter to continue...\n";
-    std::cin.get();
-
     #ifdef __linux
         #if defined(__x86_64__) || defined(_M_X64)
             #define BINARY "bin/linux64/lua_shared.so"
