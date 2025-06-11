@@ -943,16 +943,16 @@ bool LJPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn g
         // Linux x64 PLH incompatibility:
         // lua_touserdata, lua_tothread, lua_tocfunction
         #if defined(__linux) && (defined(__x86_64__) || defined(_M_X64))
-            add("lua_touserdata", (void*)lua_isuserdata_dt, 0x21);
-            add("lua_tothread", (void*)lua_tothread_dt, 0x21);
-            add("lua_tocfunction", (void*)lua_tocfunction_dt, 0x21);
+            add("lua_touserdata", (void*)lua_touserdata_dt, 0x22);
+            add("lua_tothread", (void*)lua_tothread_dt, 0x22);
+            add("lua_tocfunction", (void*)lua_tocfunction_dt, 0x22);
         #endif
 
         // Windows x64 PLH incompatibility:
         // lua_status, lua_isyieldable
         #if defined(_WIN32) && (defined(__x86_64__) || defined(_M_X64))
             add("lua_status", (void*)lua_status_dt, 0x1); // its just a jmp...
-            add("lua_isyieldable", (void*)lua_isyieldable_dt, 0x35);
+            add("lua_isyieldable", (void*)lua_isyieldable_dt, 0x36);
         #endif
     }
 
