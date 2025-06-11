@@ -23,10 +23,6 @@
 #pragma comment (lib, "../luajit/src/lua51.lib")
 #include "luajit/src/lua.hpp"
 
-#pragma comment (lib, "PolyHook_2.lib")
-#include "polyhook2/Detour/x64Detour.hpp"
-#include "polyhook2/Detour/x86Detour.hpp"
-
 #pragma comment (lib, "tier0.lib")
 #pragma comment (lib, "tier1.lib")
 #include "eiface.h"
@@ -255,14 +251,8 @@ namespace Framework {
             std::string name; // name of target routine
             void* routine; // the routine to act as replacement
             size_t size; // size of the routine (if not provided will not overwrite)
-
             void* target; // targeted routine
             std::vector<char> store; // original storage of instructions
-            #if defined(__x86_64__) || defined(_M_X64)
-                PLH::x64Detour* hook; // hook storage of routine
-            #elif defined(__i386__) || defined(_M_IX86)
-                PLH::x86Detour* hook; // hook storage of routine
-            #endif
         };
 
         std::vector<routine_data*>& get_routines() {
@@ -298,45 +288,12 @@ namespace Framework {
             data->size = size;
             data->target = nullptr;
             data->store = std::vector<char>();
-            data->hook = nullptr;
 
             auto& routines = get_routines();
             cache.emplace(name, data);
             routines.push_back(data);
         }
 
-        bool override(void* target, routine_data* data) {
-            static void* nothing = nullptr;
-
-            #if defined(__x86_64__) || defined(_M_X64)
-                auto detour = new PLH::x64Detour(
-                    (uint64_t)target,
-                    (uint64_t)data->routine,
-                    (uint64_t*)&nothing
-                );
-            #elif defined(__i386__) || defined(_M_IX86)
-                auto detour = new PLH::x86Detour(
-                    (uint64_t)target,
-                    (uint64_t)data->routine,
-                    (uint64_t*)&nothing
-                );
-            #endif
-
-            if (!detour->hook() || !detour->isHooked()) {
-                detour->unHook();
-                delete detour;
-                return false;
-            }
-
-            data->hook = detour;
-            nothing = nullptr;
-
-            return true;
-        }
-
-        // only use this if polyhook fails
-        // this inserts a jmp right at the start of a function.
-        // now this can fail very easily and cause corruption, depending on returns and etc
         bool redirect(void* target, routine_data* data)
         {
             bool writeable = Framework::is_writable(target);
@@ -381,33 +338,6 @@ namespace Framework {
             return true;
         }
 
-        // only use this if polyhook fails
-        // this overwrites the whole function by replacing every instruction.
-        // last resort as we cannot accurately determine if we are overwriting into other sections.
-        // and also if its offset based stuff we are kinda screwed (as we need to calculate the offset relatives).
-        bool overwrite(void* target, routine_data* data, size_t size) {
-            bool writeable = Framework::is_writable(target);
-
-            if (!writeable) {
-                if (!Framework::make_writeable(target, true, size)) {
-                    return false;
-                }
-            }
-
-            // TODO: using Zydis we should re-eval offsets like call operators
-
-            for (unsigned int i = 0; i < size; ++i) {
-                data->store.push_back(((unsigned char*)target)[i]);
-                ((unsigned char*)target)[i] = ((unsigned char*)data->routine)[i];
-            }
-
-            if (!writeable) {
-                Framework::make_writeable(target, false, size);
-            }
-
-            return true;
-        }
-
         size_t load(UMODULE module)
         {
             size_t count = 0;
@@ -421,15 +351,6 @@ namespace Framework {
                 else if (!redirect(target, entry)) {
                     std::cout << "[LJPatch] [ERROR] Couldn't redirect " << entry->name << "!" << std::endl;
                 }
-                /*else if (!override(target, entry)) {
-                    std::cout << "[LJPatch] [WARNING] Couldn't modify " << entry->name << ", resorting to redirect!" << std::endl;
-                    if (!redirect(target, entry)) {
-                        std::cout << "[LJPatch] [ERROR] Couldn't redirect " << entry->name << "!" << std::endl;
-                    }
-                    else {
-                        count++;
-                    }
-                }*/
                 else {
                     count++;
                 }
@@ -442,12 +363,7 @@ namespace Framework {
             auto& list = get_routines();
             for (auto& entry : list) {
                 if (entry->target != nullptr) {
-                    if (entry->hook) {
-                        entry->hook->unHook();
-                        delete entry->hook;
-                        entry->hook = nullptr;
-                    }
-                    else if (entry->store.size() > 0) {
+                    if (entry->store.size() > 0) {
                         size_t sz = entry->store.size();
 
                         bool writeable = Framework::is_writable(entry->target);

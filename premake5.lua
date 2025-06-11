@@ -97,7 +97,6 @@ workspace "plugin_ljpatch32"
                 targetname ("plugin_ljpatch_win32")
 
         filter "system:linux"
-            links { "PolyHook_2", "Zydis", "Zycore", "asmtk", "asmjit" }
             defines { "COMPILER_GCC" }
 
             filter { "system:linux", "platforms:x86" }
@@ -173,7 +172,6 @@ workspace "plugin_ljpatch64"
                 targetname ("plugin_ljpatch_win64")
 
         filter "system:linux"
-            links { "PolyHook_2", "Zydis", "Zycore", "asmtk", "asmjit" }
             defines { "COMPILER_GCC" }
 
             filter { "system:linux", "platforms:x64" }
