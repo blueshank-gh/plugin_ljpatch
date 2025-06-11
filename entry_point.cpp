@@ -360,6 +360,7 @@ namespace Framework {
             auto& routines = get_routines();
             for (auto& entry : routines) {
                 void* target = Framework::n2p(module, entry->name.c_str());
+                entry->target = target;
                 if (target == nullptr) {
                     std::cout << "[LJPatch] [WARNING] Couldn't locate " << entry->name << "!" << std::endl;
                 }
@@ -391,27 +392,29 @@ namespace Framework {
         {
             auto& list = get_routines();
             for (auto& entry : list) {
-                if (entry->hook) {
-                    entry->hook->unHook();
-                    delete entry->hook;
-                    entry->hook = nullptr;
-                }
-                else if (entry->size > 0 && entry->store.size() > 0) {
-                    bool writeable = Framework::is_writable(entry->target);
-
-                    if (!writeable) {
-                        Framework::make_writeable(entry->target, true, entry->size);
+                if (entry->target != nullptr) {
+                    if (entry->hook) {
+                        entry->hook->unHook();
+                        delete entry->hook;
+                        entry->hook = nullptr;
                     }
+                    else if (entry->size > 0 && entry->store.size() > 0) {
+                        bool writeable = Framework::is_writable(entry->target);
 
-                    for (unsigned int i = 0; i < entry->size; ++i) {
-                        ((char*)entry->target)[i] = entry->store[i];
+                        if (!writeable) {
+                            Framework::make_writeable(entry->target, true, entry->size);
+                        }
+
+                        for (unsigned int i = 0; i < entry->size; ++i) {
+                            ((char*)entry->target)[i] = entry->store[i];
+                        }
+
+                        if (!writeable) {
+                            Framework::make_writeable(entry->target, false, entry->size);
+                        }
+
+                        entry->store.clear();
                     }
-
-                    if (!writeable) {
-                        Framework::make_writeable(entry->target, false, entry->size);
-                    }
-
-                    entry->store.clear();
                 }
             }
         }
@@ -531,7 +534,24 @@ static int lua_func_type(lua_State* L)
     return 1;
 }
 
+
 namespace Overrides {
+    // This section holds all the functions we want to override.
+    // Its important that optimization techniques are disabled here.
+    // Otherwise you would have deviations & corruptions on overwrite
+
+    #if defined(_MSC_VER)
+        #define BEGIN_NOOPT __pragma(optimize("", off))
+        #define END_NOOPT   __pragma(optimize("", on))
+    #elif defined(__GNUC__) || defined(__clang__)
+        #define BEGIN_NOOPT _Pragma("GCC push_options") \
+                            _Pragma("GCC optimize(\"O0\")")
+        #define END_NOOPT   _Pragma("GCC pop_options")
+    #else
+        #define BEGIN_NOOPT
+        #define END_NOOPT
+    #endif
+
     #if defined(_MSC_VER)
         #define NOINLINE __declspec(noinline)
     #elif defined(__GNUC__) || defined(__clang__)
@@ -539,6 +559,8 @@ namespace Overrides {
     #else
         #define NOINLINE
     #endif
+
+    BEGIN_NOOPT
 
     NOINLINE int luaJIT_setmode_dt(lua_State* L, int idx, int mode) { return luaJIT_setmode(L, idx, mode); }
 
@@ -724,10 +746,17 @@ namespace Overrides {
         lua_pushcfunction(L, lua_func_type);
         lua_setfield(L, LUA_GLOBALSINDEX, "type");
     }
+
+    END_NOOPT
 }
 
 bool LJPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameServerFactory)
 {
+    std::cout << "[DEBUG] Hi, this is here for debugging, later releases won't have this.\n";
+    std::cout << "[DEBUG] You should attach a debugger here, like GDB or WINDBG.\n";
+    std::cout << "[DEBUG] Press Enter to continue...\n";
+    std::cin.get();
+
     #ifdef __linux
         #if defined(__x86_64__) || defined(_M_X64)
             #define BINARY "bin/linux64/lua_shared.so"
@@ -912,20 +941,18 @@ bool LJPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn g
         add("lua_yield", (void*)lua_yield_dt);
 
         // Linux x64 PLH incompatibility:
-        // lua_isuserdata, lua_toboolean, lua_tocfunction, lua_tothread, lua_touserdata
+        // lua_touserdata, lua_tothread, lua_tocfunction
         #if defined(__linux) && (defined(__x86_64__) || defined(_M_X64))
-            // add("lua_isuserdata", (void*)lua_isuserdata, 0x1D);
-            // add("lua_toboolean", (void*)lua_toboolean, 0x15);
-            // add("lua_tocfunction", (void*)lua_tocfunction, 0x47);
-            // add("lua_tothread", (void*)lua_tothread, 0x23);
-            // add("lua_isyieldable", (void*)lua_touserdata, 0x41);
+            add("lua_touserdata", (void*)lua_isuserdata_dt, 0x21);
+            add("lua_tothread", (void*)lua_tothread_dt, 0x21);
+            add("lua_tocfunction", (void*)lua_tocfunction_dt, 0x21);
         #endif
 
         // Windows x64 PLH incompatibility:
         // lua_status, lua_isyieldable
         #if defined(_WIN32) && (defined(__x86_64__) || defined(_M_X64))
-            // add("lua_status", (void*)lua_status, 0x4);
-            // add("lua_isyieldable", (void*)lua_isyieldable, 0x6);
+            add("lua_status", (void*)lua_status_dt, 0x1); // its just a jmp...
+            add("lua_isyieldable", (void*)lua_isyieldable_dt, 0x35);
         #endif
     }
 
