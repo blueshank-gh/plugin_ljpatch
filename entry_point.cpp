@@ -557,11 +557,12 @@ namespace Overrides {
     NOINLINE void luaL_checktype_dt(lua_State* L, int narg, int t) { return luaL_checktype(L, narg, t); }
     NOINLINE void* luaL_checkudata_dt(lua_State* L, int ud, const char* tname) { return luaL_checkudata(L, ud, tname); }
     NOINLINE int luaL_error_dt(lua_State* L, const char* fmt, ...) {
+        char buffer[512];
         va_list args;
         va_start(args, fmt);
-        int result = luaL_error(L, fmt, args);
+        vsnprintf(buffer, sizeof(buffer), fmt, args);
         va_end(args);
-        return result;
+        return luaL_error(L, "%s", buffer);
     }
     NOINLINE int luaL_execresult_dt(lua_State* L, int stat) { return luaL_execresult(L, stat); }
     NOINLINE int luaL_fileresult_dt(lua_State* L, int stat, const char* fname) { return luaL_fileresult(L, stat, fname); }
@@ -636,11 +637,12 @@ namespace Overrides {
     NOINLINE void lua_pushboolean_dt(lua_State* L, int b) { return lua_pushboolean(L, b); }
     NOINLINE void lua_pushcclosure_dt(lua_State* L, lua_CFunction f, int n) { return lua_pushcclosure(L, f, n); }
     NOINLINE const char* lua_pushfstring_dt(lua_State* L, const char* fmt, ...) {
+        char buffer[512];
         va_list args;
         va_start(args, fmt);
-        const char* result = lua_pushvfstring(L, fmt, args);
+        vsnprintf(buffer, sizeof(buffer), fmt, args);
         va_end(args);
-        return result;
+        return lua_pushvfstring(L, "%s", buffer);
     }
     NOINLINE void lua_pushinteger_dt(lua_State* L, lua_Integer n) { return lua_pushinteger(L, n); }
     NOINLINE void lua_pushlightuserdata_dt(lua_State* L, void* p) { return lua_pushlightuserdata(L, p); }
