@@ -642,7 +642,7 @@ namespace Overrides {
         va_start(args, fmt);
         vsnprintf(buffer, sizeof(buffer), fmt, args);
         va_end(args);
-        return lua_pushvfstring(L, "%s", buffer);
+        return lua_pushfstring(L, "%s", buffer);
     }
     NOINLINE void lua_pushinteger_dt(lua_State* L, lua_Integer n) { return lua_pushinteger(L, n); }
     NOINLINE void lua_pushlightuserdata_dt(lua_State* L, void* p) { return lua_pushlightuserdata(L, p); }
