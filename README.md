@@ -1,9 +1,10 @@
-# LJ Patch
-A rollback to LuaJIT in Garry's Mod.\
-This was made to undo certain changes that has been applied to LuaJIT.\
-With improvements to LuaJIT itself can now be made possible.
+<div align="center">
+  <picture>
+  <img width="295" height="79.5" src="./logo.png">
+  </picture>
 
-Feel free to contribute to fully supporting this on all architectures and platforms.
+
+</div>
 
 ## Issues
 Currently on x86_64 branch it seems sdk minimal doesn't notice on x86 that "libtier0_srv.so" doesn't exist.\
