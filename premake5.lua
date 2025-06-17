@@ -160,7 +160,7 @@ workspace "plugin_ljpatch64"
         filter { "system:windows", "platforms:x64" }
             links { "luajit/src/lua51" }
             prebuildcommands {
-                [[cmd /C "call "]] .. vsc64 .. [[" && cd ..\luajit\src && msvcbuild.bat static x64 )"]]
+                [[cmd /C "call "]] .. vsc64 .. [[" && cd ..\luajit\src && msvcbuild.bat gc64 static x64 )"]]
             }
 
         filter "system:windows"
