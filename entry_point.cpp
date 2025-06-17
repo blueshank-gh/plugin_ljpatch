@@ -511,7 +511,7 @@ namespace Overrides {
     NOINLINE int luaL_loadfilex_dt(lua_State* L, const char* filename, const char* mode) { return luaL_loadfilex(L, filename, mode); }
     NOINLINE int luaL_loadstring_dt(lua_State* L, const char* s) { return luaL_loadstring(L, s); }
     NOINLINE int luaL_newmetatable_dt(lua_State* L, const char* tname) { return luaL_newmetatable(L, tname); }
-    NOINLINE int luaL_newmetatable_type_dt(lua_State* L, const char* tname) { return luaL_newmetatable_type(L, tname); }
+    NOINLINE int luaL_newmetatable_type_dt(lua_State* L, const char* tname, int id) { return luaL_newmetatable_type(L, tname, id); }
     NOINLINE lua_State* luaL_newstate_dt(void) { return luaL_newstate(); }
     NOINLINE void luaL_openlib_dt(lua_State* L, const char* libname, const luaL_Reg* l, int nup) { return luaL_openlib(L, libname, l, nup); }
     NOINLINE void luaL_openlibs_dt(lua_State* L) { return luaL_openlibs(L); }
