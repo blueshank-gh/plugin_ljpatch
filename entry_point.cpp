@@ -464,77 +464,6 @@ namespace Overrides {
         #define NOINLINE
     #endif
 
-    // types break since we are restoring luajit
-    static int lua_func_type(lua_State* L)
-    {
-        GarrysMod::lua_State* gL = (GarrysMod::lua_State*)L;
-        GarrysMod::Lua::CLuaInterface* iL = (GarrysMod::Lua::CLuaInterface*)gL->luabase;
-
-        static const char* type_mapping[] = {
-            "nil",
-            "bool",
-            "lightuserdata",
-            "number",
-            "string",
-            "table",
-            "function",
-            "UserData",
-            "thread",
-            "Entity",
-            "Vector",
-            "Angle",
-            "PhysObj",
-            "Save",
-            "Restore",
-            "DamageInfo",
-            "EffectData",
-            "MoveData",
-            "RecipientFilter",
-            "UserCmd",
-            "ScriptedVehicle",
-            "Material",
-            "Panel",
-            "Particle",
-            "ParticleEmitter",
-            "Texture",
-            "UserMsg",
-            "ConVar",
-            "IMesh",
-            "Matrix",
-            "Sound",
-            "PixelVisHandle",
-            "DLight",
-            "Video",
-            "File",
-            "Locomotion",
-            "Path",
-            "NavArea",
-            "SoundHandle",
-            "NavLadder",
-            "ParticleSystem",
-            "ProjectedTexture",
-            "PhysCollide",
-            "SurfaceInfo",
-        };
-
-        int type = iL->GetType(1);
-        const char* type_name = nullptr;
-
-        if (type >= 0 && type < 44) {
-            type_name = type_mapping[type];
-        } else {
-            type_name = iL->GetTypeName(type);
-        }
-
-        if (type_name == nullptr) {
-            type_name = "unknown";
-        }
-
-        lua_pushstring(L, type_name);
-
-        return 1;
-    }
-
     BEGIN_NOOPT
 
     NOINLINE int luaJIT_setmode_dt(lua_State* L, int idx, int mode) { return luaJIT_setmode(L, idx, mode); }
@@ -577,19 +506,12 @@ namespace Overrides {
     NOINLINE int luaL_getmetafield_dt(lua_State* L, int idx, const char* field) { return luaL_getmetafield(L, idx, field); }
     NOINLINE const char* luaL_gsub_dt(lua_State* L, const char* s, const char* p, const char* r) { return luaL_gsub(L, s, p, r); }
     NOINLINE int luaL_loadbuffer_dt(lua_State* L, const char* buff, size_t sz, const char* name) { return luaL_loadbuffer(L, buff, sz, name); }
-    static bool first_execute = false;
-    NOINLINE int luaL_loadbufferx_dt(lua_State* L, const char* buff, size_t sz, const char* name, const char* mode) {
-        if (first_execute) {
-            first_execute = false;
-            lua_pushcfunction(L, lua_func_type);
-            lua_setfield(L, LUA_GLOBALSINDEX, "type");
-        }
-        return luaL_loadbufferx(L, buff, sz, name, mode);
-    }
+    NOINLINE int luaL_loadbufferx_dt(lua_State* L, const char* buff, size_t sz, const char* name, const char* mode) { return luaL_loadbufferx(L, buff, sz, name, mode); }
     NOINLINE int luaL_loadfile_dt(lua_State* L, const char* filename) { return luaL_loadfile(L, filename); }
     NOINLINE int luaL_loadfilex_dt(lua_State* L, const char* filename, const char* mode) { return luaL_loadfilex(L, filename, mode); }
     NOINLINE int luaL_loadstring_dt(lua_State* L, const char* s) { return luaL_loadstring(L, s); }
     NOINLINE int luaL_newmetatable_dt(lua_State* L, const char* tname) { return luaL_newmetatable(L, tname); }
+    NOINLINE int luaL_newmetatable_type_dt(lua_State* L, const char* tname) { return luaL_newmetatable_type(L, tname); }
     NOINLINE lua_State* luaL_newstate_dt(void) { return luaL_newstate(); }
     NOINLINE void luaL_openlib_dt(lua_State* L, const char* libname, const luaL_Reg* l, int nup) { return luaL_openlib(L, libname, l, nup); }
     NOINLINE void luaL_openlibs_dt(lua_State* L) { return luaL_openlibs(L); }
@@ -696,7 +618,7 @@ namespace Overrides {
     NOINLINE lua_State* lua_tothread_dt(lua_State* L, int idx) { return lua_tothread(L, idx); }
     NOINLINE void* lua_touserdata_dt(lua_State* L, int idx) { return lua_touserdata(L, idx); }
     NOINLINE int lua_type_dt(lua_State* L, int idx) { return lua_type(L, idx); }
-    NOINLINE const char* lua_typename_dt(lua_State* L, int t) { return lua_typename(L, t); }
+    NOINLINE const char* lua_typename_dt(lua_State* L, int t, int index) { return lua_typename(L, t, index); }
     NOINLINE void* lua_upvalueid_dt(lua_State* L, int idx, int n) { return lua_upvalueid(L, idx, n); }
     NOINLINE void lua_upvaluejoin_dt(lua_State* L, int idx1, int n1, int idx2, int n2) { return lua_upvaluejoin(L, idx1, n1, idx2, n2); }
     NOINLINE const lua_Number* lua_version_dt(lua_State* L) { return lua_version(L); }
@@ -727,8 +649,6 @@ namespace Overrides {
         lua_call(L, 1, 1);
         lua_setfield(L, -2, "util");
         lua_pop(L, 1);
-
-        first_execute = true;
     }
 
     END_NOOPT
@@ -813,6 +733,7 @@ bool LJPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn g
         add("luaL_loadfilex", (void*)luaL_loadfilex_dt);
         add("luaL_loadstring", (void*)luaL_loadstring_dt);
         add("luaL_newmetatable", (void*)luaL_newmetatable_dt);
+        add("luaL_newmetatable_type", (void*)luaL_newmetatable_type_dt);
         add("luaL_newstate", (void*)luaL_newstate_dt);
         add("luaL_openlib", (void*)luaL_openlib_dt);
         add("luaL_openlibs", (void*)luaL_openlibs_dtr);
