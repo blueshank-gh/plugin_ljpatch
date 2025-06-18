@@ -23,5 +23,5 @@ And thats it!
 
 ## Modifications
 This plugin isn't strictly made to just rollback LuaJIT but to also allow you to modify LuaJIT itself with your own features.\
-Just make sure that the exposed API's under `LUA_API` directive is all support, as changing their parameters and returns can cause problems.\
+Just make sure that the exposed API's under `LUA_API` directive is all supported, as changing their parameters and returns can cause problems.\
 You can modify LuaJIT itself by changing the submodule under the `luajit` folder.
