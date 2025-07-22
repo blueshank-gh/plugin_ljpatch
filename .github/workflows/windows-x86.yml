@@ -59,7 +59,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: debug_x86_windows
-          path: repository\bin\Win32\Debug\*
+          path: repository\bin\x86\Debug\*
           if-no-files-found: warn
 
   build-release:
@@ -115,5 +115,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release_x86_windows
-          path: repository\bin\Win32\Release\*
+          path: repository\bin\x86\Release\*
           if-no-files-found: warn
