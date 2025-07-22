@@ -30,6 +30,7 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y build-essential zip unzip curl cmake pkg-config git gcc-multilib g++-multilib
+          sudo apt-get install -y uuid-dev
 
       - name: Install Premake5
         run: |
@@ -91,6 +92,7 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y build-essential zip unzip curl cmake pkg-config git gcc-multilib g++-multilib
+          sudo apt-get install -y uuid-dev
 
       - name: Install Premake5
         run: |
