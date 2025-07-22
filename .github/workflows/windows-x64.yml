@@ -26,10 +26,8 @@ jobs:
           git submodule sync --recursive
           git submodule update --init --force --recursive
 
-      - name: Install packages
-        run: |
-          choco install -y cmake git zip unzip
-        shell: cmd
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v1.1
 
       - name: Install Premake5
         shell: pwsh
