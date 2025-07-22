@@ -27,7 +27,7 @@ jobs:
           git submodule update --init --force --recursive
 
       - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v1.1
+        uses: microsoft/setup-msbuild@v2
 
       - name: Install Premake5
         shell: pwsh
@@ -52,7 +52,7 @@ jobs:
         shell: pwsh
         run: |
           cd repository\build
-          msbuild plugin_ljpatch64.sln /p:Configuration=Debug /p:Platform=Win32
+          msbuild plugin_ljpatch64.sln /p:Configuration=Debug
           cd ../..
 
       - name: Upload Artifacts
@@ -82,10 +82,8 @@ jobs:
           git submodule sync --recursive
           git submodule update --init --force --recursive
 
-      - name: Install packages
-        run: |
-          choco install -y cmake git zip unzip
-        shell: cmd
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
 
       - name: Install Premake5
         shell: pwsh
@@ -110,7 +108,7 @@ jobs:
         shell: pwsh
         run: |
           cd repository\build
-          msbuild plugin_ljpatch64.sln /p:Configuration=Release /p:Platform=Win32
+          msbuild plugin_ljpatch64.sln /p:Configuration=Release
           cd ../..
 
       - name: Upload Artifacts
