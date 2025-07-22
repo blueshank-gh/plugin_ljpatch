@@ -21,7 +21,6 @@ jobs:
         shell: pwsh
         run: |
           cd repository
-          # Clean untracked files inside submodules
           git submodule foreach --recursive git reset --hard
           git submodule foreach --recursive git clean -fdx
           git submodule sync --recursive
@@ -30,7 +29,6 @@ jobs:
       - name: Install packages
         run: |
           choco install -y cmake git zip unzip
-          # You can install more packages if needed or set up your environment accordingly
         shell: cmd
 
       - name: Install Premake5
@@ -40,9 +38,7 @@ jobs:
             git clone --depth=1 https://github.com/premake/premake-core.git
           }
           cd premake-core
-          # Build premake5 for Windows
           .\Bootstrap.bat vs2022
-          # Move premake5 executable to repository root
           Move-Item .\bin\release\premake5.exe ..\repository\
           cd ..
 
