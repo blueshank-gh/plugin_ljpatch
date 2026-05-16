@@ -6,8 +6,8 @@ on:
   pull_request:
 
 jobs:
-  build-debug:
-    name: Build Debug
+  build-server-debug:
+    name: Build Server Debug
     runs-on: windows-latest
 
     steps:
@@ -52,7 +52,7 @@ jobs:
         shell: pwsh
         run: |
           cd repository\build
-          msbuild plugin_ljpatch64.sln /p:Configuration=Debug
+          msbuild plugin_ljpatch64_sv.sln /p:Configuration=Debug
           cd ../..
 
       - name: Upload Artifacts
@@ -62,8 +62,8 @@ jobs:
           path: repository\bin\x86\Debug\*
           if-no-files-found: warn
 
-  build-release:
-    name: Build Release
+  build-server-release:
+    name: Build Server Release
     runs-on: windows-latest
 
     steps:
@@ -108,7 +108,119 @@ jobs:
         shell: pwsh
         run: |
           cd repository\build
-          msbuild plugin_ljpatch64.sln /p:Configuration=Release
+          msbuild plugin_ljpatch64_sv.sln /p:Configuration=Release
+          cd ../..
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release_x86_windows
+          path: repository\bin\x86\Release\*
+          if-no-files-found: warn
+
+  build-client-debug:
+    name: Build Client Debug
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: repository
+          submodules: recursive
+
+      - name: Clean submodules (Local)
+        shell: pwsh
+        run: |
+          cd repository
+          git submodule foreach --recursive git reset --hard
+          git submodule foreach --recursive git clean -fdx
+          git submodule sync --recursive
+          git submodule update --init --force --recursive
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Install Premake5
+        shell: pwsh
+        run: |
+          if (-Not (Test-Path premake-core)) {
+            git clone --depth=1 https://github.com/premake/premake-core.git
+          }
+          cd premake-core
+          .\Bootstrap.bat vs2022
+          Move-Item .\bin\release\premake5.exe ..\repository\
+          cd ..
+
+      - name: Initialize Premake
+        shell: pwsh
+        run: |
+          cd repository
+          .\premake5.exe vs2022
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+
+      - name: Build
+        shell: pwsh
+        run: |
+          cd repository\build
+          msbuild plugin_ljpatch64_cl.sln /p:Configuration=Debug
+          cd ../..
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug_x86_windows
+          path: repository\bin\x86\Debug\*
+          if-no-files-found: warn
+
+  build-client-release:
+    name: Build Client Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: repository
+          submodules: recursive
+
+      - name: Clean submodules (Local)
+        shell: pwsh
+        run: |
+          cd repository
+          git submodule foreach --recursive git reset --hard
+          git submodule foreach --recursive git clean -fdx
+          git submodule sync --recursive
+          git submodule update --init --force --recursive
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Install Premake5
+        shell: pwsh
+        run: |
+          if (-Not (Test-Path premake-core)) {
+            git clone --depth=1 https://github.com/premake/premake-core.git
+          }
+          cd premake-core
+          .\Bootstrap.bat vs2022
+          Move-Item .\bin\release\premake5.exe ..\repository\
+          cd ..
+
+      - name: Initialize Premake
+        shell: pwsh
+        run: |
+          cd repository
+          .\premake5.exe vs2022
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+
+      - name: Build Release
+        shell: pwsh
+        run: |
+          cd repository\build
+          msbuild plugin_ljpatch64_cl.sln /p:Configuration=Release
           cd ../..
 
       - name: Upload Artifacts
