@@ -389,6 +389,7 @@ namespace Framework {
     }
 }
 
+#ifdef INTERFACE_PLUGIN
 class LJPatchPlugin : public IServerPluginCallbacks
 {
 public:
@@ -429,6 +430,7 @@ LJPatchPlugin::LJPatchPlugin()
 LJPatchPlugin::~LJPatchPlugin()
 {
 }
+#endif
 
 //---------------------------------------------------------------------------------
 // Purpose: called when the plugin is loaded, load the interface we need from the engine
@@ -437,7 +439,6 @@ LJPatchPlugin::~LJPatchPlugin()
 #include "glua/Interface.h"
 #include "glua/LuaInterface.h"
 #include "glua/LuaShared.h"
-GarrysMod::Lua::ILuaShared* lua_shared_interface;
 
 namespace Overrides {
     // This section holds all the functions we want to override.
@@ -654,222 +655,222 @@ namespace Overrides {
     END_NOOPT
 }
 
+#ifdef __linux
+    #if defined(__x86_64__) || defined(_M_X64)
+        #define BINARY "bin/linux64/lua_shared.so"
+    #elif defined(__i386__) || defined(_M_IX86)
+        #define BINARY "bin/linux32/lua_shared.so"
+        #define BINARY2 "garrysmod/bin/lua_shared_srv.so"
+    #endif
+#else
+    #if defined(__x86_64__) || defined(_M_X64)
+        #define BINARY "bin/win64/lua_shared.dll"
+    #elif defined(__i386__) || defined(_M_IX86)
+        #define BINARY "bin/lua_shared.dll"
+        #define BINARY2 "garrysmod/bin/lua_shared.dll"
+    #endif
+#endif
+
+namespace LJPatch {
+    bool Load() {
+        std::cout << "LJPatch - ";
+
+        #if defined(_WIN32)
+            std::cout << "Windows ";
+        #elif defined(__linux__)
+            std::cout << "Linux ";
+        #endif
+
+        #if defined(__x86_64__) || defined(_M_X64)
+            std::cout << "x64";
+        #elif defined(__i386__) || defined(_M_IX86)
+            std::cout << "x86";
+        #endif
+
+        std::cout << " - " __TIME__ " " __DATE__;
+        std::cout << std::endl;
+        std::cout << "Rolling Back LuaJIT & Feature Restoration" << std::endl;
+
+        std::cout << "[LJPatch] Adding Registry..." << std::endl;
+        {
+            using Framework::Routines::add;
+            using namespace Overrides;
+
+            add("luaJIT_setmode", (void*)luaJIT_setmode_dt);
+
+            add("luaopen_base", (void*)luaopen_base_dt);
+            add("luaopen_bit", (void*)luaopen_bit_dt);
+            add("luaopen_debug", (void*)luaopen_debug_dt);
+            add("luaopen_jit", (void*)luaopen_jit_dt);
+            add("luaopen_math", (void*)luaopen_math_dt);
+            add("luaopen_os", (void*)luaopen_os_dt);
+            add("luaopen_package", (void*)luaopen_package_dt);
+            add("luaopen_string", (void*)luaopen_string_dt);
+            add("luaopen_table", (void*)luaopen_table_dt);
+
+            add("luaL_addlstring", (void*)luaL_addlstring_dt);
+            add("luaL_addstring", (void*)luaL_addstring_dt);
+            add("luaL_addvalue", (void*)luaL_addvalue_dt);
+            add("luaL_argerror", (void*)luaL_argerror_dt);
+            add("luaL_buffinit", (void*)luaL_buffinit_dt);
+            add("luaL_callmeta", (void*)luaL_callmeta_dt);
+            add("luaL_checkany", (void*)luaL_checkany_dt);
+            add("luaL_checkinteger", (void*)luaL_checkinteger_dt);
+            add("luaL_checklstring", (void*)luaL_checklstring_dt);
+            add("luaL_checknumber", (void*)luaL_checknumber_dt);
+            add("luaL_checkoption", (void*)luaL_checkoption_dt);
+            add("luaL_checkstack", (void*)luaL_checkstack_dt);
+            add("luaL_checktype", (void*)luaL_checktype_dt);
+            add("luaL_checkudata", (void*)luaL_checkudata_dt);
+            add("luaL_error", (void*)luaL_error_dt);
+            add("luaL_execresult", (void*)luaL_execresult_dt);
+            add("luaL_fileresult", (void*)luaL_fileresult_dt);
+            add("luaL_findtable", (void*)luaL_findtable_dt);
+            add("luaL_getmetafield", (void*)luaL_getmetafield_dt);
+            add("luaL_gsub", (void*)luaL_gsub_dt);
+            add("luaL_loadbuffer", (void*)luaL_loadbuffer_dt);
+            add("luaL_loadbufferx", (void*)luaL_loadbufferx_dt);
+            add("luaL_loadfile", (void*)luaL_loadfile_dt);
+            add("luaL_loadfilex", (void*)luaL_loadfilex_dt);
+            add("luaL_loadstring", (void*)luaL_loadstring_dt);
+            add("luaL_newmetatable", (void*)luaL_newmetatable_dt);
+            add("luaL_newmetatable_type", (void*)luaL_newmetatable_type_dt);
+            add("luaL_newstate", (void*)luaL_newstate_dt);
+            add("luaL_openlib", (void*)luaL_openlib_dt);
+            add("luaL_openlibs", (void*)luaL_openlibs_dtr);
+            add("luaL_optinteger", (void*)luaL_optinteger_dt);
+            add("luaL_optlstring", (void*)luaL_optlstring_dt);
+            add("luaL_optnumber", (void*)luaL_optnumber_dt);
+            add("luaL_prepbuffer", (void*)luaL_prepbuffer_dt);
+            add("luaL_pushmodule", (void*)luaL_pushmodule_dt);
+            add("luaL_pushresult", (void*)luaL_pushresult_dt);
+            add("luaL_ref", (void*)luaL_ref_dt);
+            add("luaL_register", (void*)luaL_register_dt);
+            add("luaL_setfuncs", (void*)luaL_setfuncs_dt);
+            add("luaL_setmetatable", (void*)luaL_setmetatable_dt);
+            add("luaL_testudata", (void*)luaL_testudata_dt);
+            add("luaL_traceback", (void*)luaL_traceback_dt);
+            add("luaL_typerror", (void*)luaL_typerror_dt);
+            add("luaL_unref", (void*)luaL_unref_dt);
+            add("luaL_where", (void*)luaL_where_dt);
+
+            add("lua_atpanic", (void*)lua_atpanic_dt);
+            add("lua_call", (void*)lua_call_dt);
+            add("lua_checkstack", (void*)lua_checkstack_dt);
+            add("lua_close", (void*)lua_close_dt);
+            add("lua_concat", (void*)lua_concat_dt);
+            add("lua_copy", (void*)lua_copy_dt);
+            add("lua_cpcall", (void*)lua_cpcall_dt);
+            add("lua_createtable", (void*)lua_createtable_dt);
+            add("lua_dump", (void*)lua_dump_dt);
+            add("lua_equal", (void*)lua_equal_dt);
+            add("lua_error", (void*)lua_error_dt);
+            add("lua_gc", (void*)lua_gc_dt);
+            add("lua_getallocf", (void*)lua_getallocf_dt);
+            add("lua_getfenv", (void*)lua_getfenv_dt);
+            add("lua_getfield", (void*)lua_getfield_dt);
+            add("lua_gethook", (void*)lua_gethook_dt);
+            add("lua_gethookcount", (void*)lua_gethookcount_dt);
+            add("lua_gethookmask", (void*)lua_gethookmask_dt);
+            add("lua_getinfo", (void*)lua_getinfo_dt);
+            add("lua_getlocal", (void*)lua_getlocal_dt);
+            add("lua_getmetatable", (void*)lua_getmetatable_dt);
+            add("lua_getstack", (void*)lua_getstack_dt);
+            add("lua_gettable", (void*)lua_gettable_dt);
+            add("lua_gettop", (void*)lua_gettop_dt);
+            add("lua_getupvalue", (void*)lua_getupvalue_dt);
+            add("lua_insert", (void*)lua_insert_dt);
+            add("lua_iscfunction", (void*)lua_iscfunction_dt);
+            add("lua_isnumber", (void*)lua_isnumber_dt);
+            add("lua_isstring", (void*)lua_isstring_dt);
+            add("lua_isuserdata", (void*)lua_isuserdata_dt);
+            add("lua_isyieldable", (void*)lua_isyieldable_dt);
+            add("lua_lessthan", (void*)lua_lessthan_dt);
+            add("lua_load", (void*)lua_load_dt);
+            add("lua_loadx", (void*)lua_loadx_dt);
+            add("lua_newstate", (void*)lua_newstate_dt);
+            add("lua_newthread", (void*)lua_newthread_dt);
+            add("lua_newuserdata", (void*)lua_newuserdata_dt);
+            add("lua_next", (void*)lua_next_dt);
+            add("lua_objlen", (void*)lua_objlen_dt);
+            add("lua_pcall", (void*)lua_pcall_dt);
+            add("lua_pushboolean", (void*)lua_pushboolean_dt);
+            add("lua_pushcclosure", (void*)lua_pushcclosure_dt);
+            add("lua_pushfstring", (void*)lua_pushfstring_dt);
+            add("lua_pushinteger", (void*)lua_pushinteger_dt);
+            add("lua_pushlightuserdata", (void*)lua_pushlightuserdata_dt);
+            add("lua_pushlstring", (void*)lua_pushlstring_dt);
+            add("lua_pushnil", (void*)lua_pushnil_dt);
+            add("lua_pushnumber", (void*)lua_pushnumber_dt);
+            add("lua_pushstring", (void*)lua_pushstring_dt);
+            add("lua_pushthread", (void*)lua_pushthread_dt);
+            add("lua_pushvalue", (void*)lua_pushvalue_dt);
+            add("lua_pushvfstring", (void*)lua_pushvfstring_dt);
+            add("lua_rawequal", (void*)lua_rawequal_dt);
+            add("lua_rawget", (void*)lua_rawget_dt);
+            add("lua_rawgeti", (void*)lua_rawgeti_dt);
+            add("lua_rawset", (void*)lua_rawset_dt);
+            add("lua_rawseti", (void*)lua_rawseti_dt);
+            add("lua_remove", (void*)lua_remove_dt);
+            add("lua_replace", (void*)lua_replace_dt);
+            add("lua_setallocf", (void*)lua_setallocf_dt);
+            add("lua_setfenv", (void*)lua_setfenv_dt);
+            add("lua_setfield", (void*)lua_setfield_dt);
+            add("lua_sethook", (void*)lua_sethook_dt);
+            add("lua_setlocal", (void*)lua_setlocal_dt);
+            add("lua_setmetatable", (void*)lua_setmetatable_dt);
+            add("lua_settable", (void*)lua_settable_dt);
+            add("lua_settop", (void*)lua_settop_dt);
+            add("lua_setupvalue", (void*)lua_setupvalue_dt);
+            add("lua_status", (void*)lua_status_dt);
+            add("lua_toboolean", (void*)lua_toboolean_dt);
+            add("lua_tocfunction", (void*)lua_tocfunction_dt);
+            add("lua_tointeger", (void*)lua_tointeger_dt);
+            add("lua_tointegerx", (void*)lua_tointegerx_dt);
+            add("lua_tolstring", (void*)lua_tolstring_dt);
+            add("lua_tonumber", (void*)lua_tonumber_dt);
+            add("lua_tonumberx", (void*)lua_tonumberx_dt);
+            add("lua_topointer", (void*)lua_topointer_dt);
+            add("lua_tothread", (void*)lua_tothread_dt);
+            add("lua_touserdata", (void*)lua_touserdata_dt);
+            add("lua_type", (void*)lua_type_dt);
+            add("lua_typename", (void*)lua_typename_dt);
+            add("lua_upvalueid", (void*)lua_upvalueid_dt);
+            add("lua_upvaluejoin", (void*)lua_upvaluejoin_dt);
+            add("lua_version", (void*)lua_version_dt);
+            add("lua_xmove", (void*)lua_xmove_dt);
+            add("lua_yield", (void*)lua_yield_dt);
+        }
+
+        #ifdef BINARY2
+            const char* binary = BINARY2;
+            auto lua_shared = Framework::mopen(BINARY2);
+            if (!lua_shared) {
+                binary = BINARY;
+                lua_shared = Framework::mopen(BINARY);
+            }
+        #else
+            const char* binary = BINARY;
+            auto lua_shared = Framework::mopen(BINARY);
+        #endif
+
+        if (!lua_shared) {
+            std::cout << "[LJPatch] [ERROR] Couldn't initialize properly, couldn't find lua_shared." << std::endl;
+            return false;
+        }
+
+        std::cout << "[LJPatch] Patching..." << std::endl;
+        size_t count = Framework::Routines::load(lua_shared);
+        std::cout << "[LJPatch] Restored: " << count << " / " << Framework::Routines::count() << " APIs" << std::endl;
+
+        return true;
+    }
+}
+
+#ifdef INTERFACE_PLUGIN
 bool LJPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameServerFactory)
 {
-    #ifdef __linux
-        #if defined(__x86_64__) || defined(_M_X64)
-            #define BINARY "bin/linux64/lua_shared.so"
-        #elif defined(__i386__) || defined(_M_IX86)
-            #define BINARY "bin/linux32/lua_shared.so"
-            #define BINARY2 "garrysmod/bin/lua_shared_srv.so"
-        #endif
-    #else
-        #if defined(__x86_64__) || defined(_M_X64)
-            #define BINARY "bin/win64/lua_shared.dll"
-        #elif defined(__i386__) || defined(_M_IX86)
-            #define BINARY "bin/lua_shared.dll"
-            #define BINARY2 "garrysmod/bin/lua_shared.dll"
-        #endif
-    #endif
-
-    std::cout << "LJPatch - ";
-
-    #if defined(_WIN32)
-        std::cout << "Windows ";
-    #elif defined(__linux__)
-        std::cout << "Linux ";
-    #endif
-
-    #if defined(__x86_64__) || defined(_M_X64)
-        std::cout << "x64";
-    #elif defined(__i386__) || defined(_M_IX86)
-        std::cout << "x86";
-    #endif
-
-    std::cout << " - " __TIME__ " " __DATE__;
-    std::cout << std::endl;
-    std::cout << "Rolling Back LuaJIT & Feature Restoration" << std::endl;
-
-    std::cout << "[LJPatch] Adding Registry..." << std::endl;
-    {
-        using Framework::Routines::add;
-        using namespace Overrides;
-
-        add("luaJIT_setmode", (void*)luaJIT_setmode_dt);
-
-        add("luaopen_base", (void*)luaopen_base_dt);
-        add("luaopen_bit", (void*)luaopen_bit_dt);
-        add("luaopen_debug", (void*)luaopen_debug_dt);
-        add("luaopen_jit", (void*)luaopen_jit_dt);
-        add("luaopen_math", (void*)luaopen_math_dt);
-        add("luaopen_os", (void*)luaopen_os_dt);
-        add("luaopen_package", (void*)luaopen_package_dt);
-        add("luaopen_string", (void*)luaopen_string_dt);
-        add("luaopen_table", (void*)luaopen_table_dt);
-
-        add("luaL_addlstring", (void*)luaL_addlstring_dt);
-        add("luaL_addstring", (void*)luaL_addstring_dt);
-        add("luaL_addvalue", (void*)luaL_addvalue_dt);
-        add("luaL_argerror", (void*)luaL_argerror_dt);
-        add("luaL_buffinit", (void*)luaL_buffinit_dt);
-        add("luaL_callmeta", (void*)luaL_callmeta_dt);
-        add("luaL_checkany", (void*)luaL_checkany_dt);
-        add("luaL_checkinteger", (void*)luaL_checkinteger_dt);
-        add("luaL_checklstring", (void*)luaL_checklstring_dt);
-        add("luaL_checknumber", (void*)luaL_checknumber_dt);
-        add("luaL_checkoption", (void*)luaL_checkoption_dt);
-        add("luaL_checkstack", (void*)luaL_checkstack_dt);
-        add("luaL_checktype", (void*)luaL_checktype_dt);
-        add("luaL_checkudata", (void*)luaL_checkudata_dt);
-        add("luaL_error", (void*)luaL_error_dt);
-        add("luaL_execresult", (void*)luaL_execresult_dt);
-        add("luaL_fileresult", (void*)luaL_fileresult_dt);
-        add("luaL_findtable", (void*)luaL_findtable_dt);
-        add("luaL_getmetafield", (void*)luaL_getmetafield_dt);
-        add("luaL_gsub", (void*)luaL_gsub_dt);
-        add("luaL_loadbuffer", (void*)luaL_loadbuffer_dt);
-        add("luaL_loadbufferx", (void*)luaL_loadbufferx_dt);
-        add("luaL_loadfile", (void*)luaL_loadfile_dt);
-        add("luaL_loadfilex", (void*)luaL_loadfilex_dt);
-        add("luaL_loadstring", (void*)luaL_loadstring_dt);
-        add("luaL_newmetatable", (void*)luaL_newmetatable_dt);
-        add("luaL_newmetatable_type", (void*)luaL_newmetatable_type_dt);
-        add("luaL_newstate", (void*)luaL_newstate_dt);
-        add("luaL_openlib", (void*)luaL_openlib_dt);
-        add("luaL_openlibs", (void*)luaL_openlibs_dtr);
-        add("luaL_optinteger", (void*)luaL_optinteger_dt);
-        add("luaL_optlstring", (void*)luaL_optlstring_dt);
-        add("luaL_optnumber", (void*)luaL_optnumber_dt);
-        add("luaL_prepbuffer", (void*)luaL_prepbuffer_dt);
-        add("luaL_pushmodule", (void*)luaL_pushmodule_dt);
-        add("luaL_pushresult", (void*)luaL_pushresult_dt);
-        add("luaL_ref", (void*)luaL_ref_dt);
-        add("luaL_register", (void*)luaL_register_dt);
-        add("luaL_setfuncs", (void*)luaL_setfuncs_dt);
-        add("luaL_setmetatable", (void*)luaL_setmetatable_dt);
-        add("luaL_testudata", (void*)luaL_testudata_dt);
-        add("luaL_traceback", (void*)luaL_traceback_dt);
-        add("luaL_typerror", (void*)luaL_typerror_dt);
-        add("luaL_unref", (void*)luaL_unref_dt);
-        add("luaL_where", (void*)luaL_where_dt);
-
-        add("lua_atpanic", (void*)lua_atpanic_dt);
-        add("lua_call", (void*)lua_call_dt);
-        add("lua_checkstack", (void*)lua_checkstack_dt);
-        add("lua_close", (void*)lua_close_dt);
-        add("lua_concat", (void*)lua_concat_dt);
-        add("lua_copy", (void*)lua_copy_dt);
-        add("lua_cpcall", (void*)lua_cpcall_dt);
-        add("lua_createtable", (void*)lua_createtable_dt);
-        add("lua_dump", (void*)lua_dump_dt);
-        add("lua_equal", (void*)lua_equal_dt);
-        add("lua_error", (void*)lua_error_dt);
-        add("lua_gc", (void*)lua_gc_dt);
-        add("lua_getallocf", (void*)lua_getallocf_dt);
-        add("lua_getfenv", (void*)lua_getfenv_dt);
-        add("lua_getfield", (void*)lua_getfield_dt);
-        add("lua_gethook", (void*)lua_gethook_dt);
-        add("lua_gethookcount", (void*)lua_gethookcount_dt);
-        add("lua_gethookmask", (void*)lua_gethookmask_dt);
-        add("lua_getinfo", (void*)lua_getinfo_dt);
-        add("lua_getlocal", (void*)lua_getlocal_dt);
-        add("lua_getmetatable", (void*)lua_getmetatable_dt);
-        add("lua_getstack", (void*)lua_getstack_dt);
-        add("lua_gettable", (void*)lua_gettable_dt);
-        add("lua_gettop", (void*)lua_gettop_dt);
-        add("lua_getupvalue", (void*)lua_getupvalue_dt);
-        add("lua_insert", (void*)lua_insert_dt);
-        add("lua_iscfunction", (void*)lua_iscfunction_dt);
-        add("lua_isnumber", (void*)lua_isnumber_dt);
-        add("lua_isstring", (void*)lua_isstring_dt);
-        add("lua_isuserdata", (void*)lua_isuserdata_dt);
-        add("lua_isyieldable", (void*)lua_isyieldable_dt);
-        add("lua_lessthan", (void*)lua_lessthan_dt);
-        add("lua_load", (void*)lua_load_dt);
-        add("lua_loadx", (void*)lua_loadx_dt);
-        add("lua_newstate", (void*)lua_newstate_dt);
-        add("lua_newthread", (void*)lua_newthread_dt);
-        add("lua_newuserdata", (void*)lua_newuserdata_dt);
-        add("lua_next", (void*)lua_next_dt);
-        add("lua_objlen", (void*)lua_objlen_dt);
-        add("lua_pcall", (void*)lua_pcall_dt);
-        add("lua_pushboolean", (void*)lua_pushboolean_dt);
-        add("lua_pushcclosure", (void*)lua_pushcclosure_dt);
-        add("lua_pushfstring", (void*)lua_pushfstring_dt);
-        add("lua_pushinteger", (void*)lua_pushinteger_dt);
-        add("lua_pushlightuserdata", (void*)lua_pushlightuserdata_dt);
-        add("lua_pushlstring", (void*)lua_pushlstring_dt);
-        add("lua_pushnil", (void*)lua_pushnil_dt);
-        add("lua_pushnumber", (void*)lua_pushnumber_dt);
-        add("lua_pushstring", (void*)lua_pushstring_dt);
-        add("lua_pushthread", (void*)lua_pushthread_dt);
-        add("lua_pushvalue", (void*)lua_pushvalue_dt);
-        add("lua_pushvfstring", (void*)lua_pushvfstring_dt);
-        add("lua_rawequal", (void*)lua_rawequal_dt);
-        add("lua_rawget", (void*)lua_rawget_dt);
-        add("lua_rawgeti", (void*)lua_rawgeti_dt);
-        add("lua_rawset", (void*)lua_rawset_dt);
-        add("lua_rawseti", (void*)lua_rawseti_dt);
-        add("lua_remove", (void*)lua_remove_dt);
-        add("lua_replace", (void*)lua_replace_dt);
-        add("lua_setallocf", (void*)lua_setallocf_dt);
-        add("lua_setfenv", (void*)lua_setfenv_dt);
-        add("lua_setfield", (void*)lua_setfield_dt);
-        add("lua_sethook", (void*)lua_sethook_dt);
-        add("lua_setlocal", (void*)lua_setlocal_dt);
-        add("lua_setmetatable", (void*)lua_setmetatable_dt);
-        add("lua_settable", (void*)lua_settable_dt);
-        add("lua_settop", (void*)lua_settop_dt);
-        add("lua_setupvalue", (void*)lua_setupvalue_dt);
-        add("lua_status", (void*)lua_status_dt);
-        add("lua_toboolean", (void*)lua_toboolean_dt);
-        add("lua_tocfunction", (void*)lua_tocfunction_dt);
-        add("lua_tointeger", (void*)lua_tointeger_dt);
-        add("lua_tointegerx", (void*)lua_tointegerx_dt);
-        add("lua_tolstring", (void*)lua_tolstring_dt);
-        add("lua_tonumber", (void*)lua_tonumber_dt);
-        add("lua_tonumberx", (void*)lua_tonumberx_dt);
-        add("lua_topointer", (void*)lua_topointer_dt);
-        add("lua_tothread", (void*)lua_tothread_dt);
-        add("lua_touserdata", (void*)lua_touserdata_dt);
-        add("lua_type", (void*)lua_type_dt);
-        add("lua_typename", (void*)lua_typename_dt);
-        add("lua_upvalueid", (void*)lua_upvalueid_dt);
-        add("lua_upvaluejoin", (void*)lua_upvaluejoin_dt);
-        add("lua_version", (void*)lua_version_dt);
-        add("lua_xmove", (void*)lua_xmove_dt);
-        add("lua_yield", (void*)lua_yield_dt);
-    }
-
-    #ifdef BINARY2
-        const char* binary = BINARY2;
-        auto lua_shared = Framework::mopen(BINARY2);
-        if (!lua_shared) {
-            binary = BINARY;
-            lua_shared = Framework::mopen(BINARY);
-        }
-    #else
-        const char* binary = BINARY;
-        auto lua_shared = Framework::mopen(BINARY);
-    #endif
-
-    if (!lua_shared) {
-        std::cout << "[LJPatch] [ERROR] Couldn't initialize properly, couldn't find lua_shared." << std::endl;
-        return false;
-    }
-
-    lua_shared_interface = Framework::Interface<GarrysMod::Lua::ILuaShared*>(binary, GMOD_LUASHARED_INTERFACE);
-
-    if (!lua_shared_interface) {
-        std::cout << "[LJPatch] [ERROR] Couldn't initialize properly, couldn't find lua interface." << std::endl;
-        return 0;
-    }
-
-    std::cout << "[LJPatch] Patching..." << std::endl;
-    size_t count = Framework::Routines::load(lua_shared);
-    std::cout << "[LJPatch] Restored: " << count << " / " << Framework::Routines::count() << " APIs" << std::endl;
-
-    return true;
+    return LJPatch::Load();
 }
 
 //---------------------------------------------------------------------------------
@@ -1007,3 +1008,37 @@ void LJPatchPlugin::OnEdictFreed(const edict_t* edict)
 
 LJPatchPlugin g_LJPatchPlugin;
 EXPOSE_SINGLE_INTERFACE_GLOBALVAR(LJPatchPlugin, IServerPluginCallbacks, INTERFACEVERSION_ISERVERPLUGINCALLBACKS, g_LJPatchPlugin);
+#endif
+
+#ifdef INTERFACE_PRELOAD
+#include "mimic.h"
+
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
+{
+    switch (fdwReason)
+    {
+    case DLL_PROCESS_ATTACH: {
+        auto binary = LoadLibraryA(BINARY);
+#ifdef BINARY2
+        if (!binary) {
+            binary = LoadLibraryA(BINARY2);
+        }
+#endif
+
+        if (!binary) {
+            std::cout << "[LJPatch] Failed to preload lua_shared.dll!" << std::endl;
+        }
+        else LJPatch::Load();
+
+        break;
+    }
+    case DLL_THREAD_ATTACH:
+        break;
+    case DLL_THREAD_DETACH:
+        break;
+    case DLL_PROCESS_DETACH:
+        break;
+    }
+    return TRUE;
+}
+#endif
