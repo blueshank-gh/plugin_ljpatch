@@ -52,7 +52,7 @@ jobs:
         shell: pwsh
         run: |
           cd repository\build
-          msbuild plugin_ljpatch64_sv.sln /p:Configuration=Debug
+          msbuild plugin_ljpatch86_sv.sln /p:Configuration=Debug
           cd ../..
 
       - name: Upload Artifacts
@@ -108,7 +108,7 @@ jobs:
         shell: pwsh
         run: |
           cd repository\build
-          msbuild plugin_ljpatch64_sv.sln /p:Configuration=Release
+          msbuild plugin_ljpatch86_sv.sln /p:Configuration=Release
           cd ../..
 
       - name: Upload Artifacts
@@ -164,7 +164,7 @@ jobs:
         shell: pwsh
         run: |
           cd repository\build
-          msbuild plugin_ljpatch64_cl.sln /p:Configuration=Debug
+          msbuild plugin_ljpatch86_cl.sln /p:Configuration=Debug
           cd ../..
 
       - name: Upload Artifacts
@@ -220,7 +220,7 @@ jobs:
         shell: pwsh
         run: |
           cd repository\build
-          msbuild plugin_ljpatch64_cl.sln /p:Configuration=Release
+          msbuild plugin_ljpatch86_cl.sln /p:Configuration=Release
           cd ../..
 
       - name: Upload Artifacts
