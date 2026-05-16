@@ -58,7 +58,7 @@ jobs:
       - name: Build
         run: |
           cd repository/build
-          make -f plugin_ljpatch32_sv.make config=debug_x86
+          make -f plugin_ljpatch86_sv.make config=debug_x86
           cd ../..
 
       - name: Upload Artifacts
@@ -120,7 +120,7 @@ jobs:
       - name: Build Release
         run: |
           cd repository/build
-          make -f plugin_ljpatch32_sv.make config=release_x86
+          make -f plugin_ljpatch86_sv.make config=release_x86
           cd ../..
 
       - name: Upload Artifacts
