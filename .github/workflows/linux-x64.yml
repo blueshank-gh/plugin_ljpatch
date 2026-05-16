@@ -6,8 +6,8 @@ on:
   pull_request:
 
 jobs:
-  build-debug:
-    name: Build Debug
+  build-server-debug:
+    name: Build Server Debug
     runs-on: ubuntu-latest
 
     steps:
@@ -58,7 +58,7 @@ jobs:
       - name: Build
         run: |
           cd repository/build
-          make -f plugin_ljpatch64.make config=debug_x64
+          make -f plugin_ljpatch64_sv.make config=debug_x64
           cd ../..
 
       - name: Upload Artifacts
@@ -68,8 +68,8 @@ jobs:
           path: repository/bin/x64/Debug/*
           if-no-files-found: warn
 
-  build-release:
-    name: Build Release
+  build-server-release:
+    name: Build Server Release
     runs-on: ubuntu-latest
 
     steps:
@@ -120,7 +120,7 @@ jobs:
       - name: Build Release
         run: |
           cd repository/build
-          make -f plugin_ljpatch64.make config=release_x64
+          make -f plugin_ljpatch64_sv.make config=release_x64
           cd ../..
 
       - name: Upload Artifacts
