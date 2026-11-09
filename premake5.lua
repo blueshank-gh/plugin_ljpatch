@@ -67,7 +67,7 @@ local function setup(params)
             end
 
             targetdir ("bin/%{cfg.platform}/%{cfg.buildcfg}")
-            objdir ("bin-int/%{cfg.platform}/%{cfg.buildcfg}")
+            objdir ("bin-int/%{prj.name}/%{cfg.platform}/%{cfg.buildcfg}")
 
             local sdk = "sdk" .. params.bitness
             files { "entry_point.cpp", "luajit/src/**.h", "glua/**.h", sdk .. "/**.hpp", sdk .. "/**.h", sdk .. "/**.lib" }

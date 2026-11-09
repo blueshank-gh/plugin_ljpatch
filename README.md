@@ -25,10 +25,9 @@ And thats it!
 
 ### Client
 Clients don't load plugins, so we have to preload the patcher instead.\
-After building, rename your module to `version.dll` (as that's what it mimics), and put it in the same folder as `gmod.exe` of the respective bitness.\
-i.e. `GarrysMod/bin/win64/version.dll` for `x86-64` 64-bit client.
+The module mimics the full export table of `version.dll`, `winmm.dll`, `winhttp.dll`, and `wininet.dll`, so it can be copied under any of those names.
 
-Currently, only windows is supported for clients; it shouldn't be hard to add linux support via LD_PRELOAD, so we'll be happy if someone makes a PR.
+Currently, linux client is being looked into for support at some point, just not right now, but it's on the roadmap.
 
 ## Modifications
 This plugin isn't strictly made to just rollback LuaJIT but to also allow you to modify LuaJIT itself with your own features.\

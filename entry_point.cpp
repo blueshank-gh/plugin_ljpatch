@@ -1017,6 +1017,62 @@ EXPOSE_SINGLE_INTERFACE_GLOBALVAR(LJPatchPlugin, IServerPluginCallbacks, INTERFA
 #ifdef INTERFACE_PRELOAD
 #include "mimic.h"
 
+#if defined(_WIN32)
+#include <guiddef.h>
+
+static const char LJPatchMimicAnchor = 0;
+
+static HMODULE LJPatchMimicTarget()
+{
+    static HMODULE target = []() -> HMODULE {
+        const wchar_t* name = L"winhttp.dll";
+
+        HMODULE self = nullptr;
+        if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCWSTR>(&LJPatchMimicAnchor), &self)) {
+            wchar_t path[MAX_PATH];
+            DWORD length = GetModuleFileNameW(self, path, MAX_PATH);
+            if (length > 0 && length < MAX_PATH) {
+                const wchar_t* file = wcsrchr(path, L'\\');
+                file = file ? file + 1 : path;
+                if (_wcsicmp(file, L"wininet.dll") == 0)
+                    name = L"wininet.dll";
+            }
+        }
+
+        wchar_t directory[MAX_PATH];
+        UINT directoryLength = GetSystemDirectoryW(directory, MAX_PATH);
+        if (directoryLength == 0 || directoryLength >= MAX_PATH)
+            return nullptr;
+
+        std::wstring full(directory);
+        full += L"\\";
+        full += name;
+        return LoadLibraryW(full.c_str());
+    }();
+    return target;
+}
+
+extern "C" HRESULT WINAPI LJPatchDllCanUnloadNow()
+{
+    typedef HRESULT (WINAPI* routine_t)();
+    static routine_t routine = []() -> routine_t {
+        HMODULE module = LJPatchMimicTarget();
+        return module ? reinterpret_cast<routine_t>(GetProcAddress(module, "DllCanUnloadNow")) : nullptr;
+    }();
+    return routine ? routine() : S_FALSE;
+}
+
+extern "C" HRESULT WINAPI LJPatchDllGetClassObject(const GUID* rclsid, const GUID* riid, void** ppv)
+{
+    typedef HRESULT (WINAPI* routine_t)(const GUID*, const GUID*, void**);
+    static routine_t routine = []() -> routine_t {
+        HMODULE module = LJPatchMimicTarget();
+        return module ? reinterpret_cast<routine_t>(GetProcAddress(module, "DllGetClassObject")) : nullptr;
+    }();
+    return routine ? routine(rclsid, riid, ppv) : CLASS_E_CLASSNOTAVAILABLE;
+}
+#endif
+
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
     switch (fdwReason)
