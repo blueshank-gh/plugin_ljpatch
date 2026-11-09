@@ -7,7 +7,8 @@
 </div>
 
 ## Dangers
-This restores dangerous API's such as FFI to LuaJIT, you have been warned.
+**FFI is disabled by default.**\
+Add `-ffi` to the server or client launch command line to enable it, without that flag the `ffi` module is not exposed to Lua.
 
 ## Installation
 ### Server

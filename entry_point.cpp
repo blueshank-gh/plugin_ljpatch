@@ -30,6 +30,84 @@
 #include "tier1/interface.h"
 #include "engine/iserverplugin.h"
 
+static bool LJPatchFFIEnabled()
+{
+    static int enabled = -1;
+    if (enabled >= 0)
+        return enabled != 0;
+
+    bool found = false;
+    #if defined(_WIN32)
+        const char* cmdline = GetCommandLineA();
+        const char* p = cmdline;
+        while (p && *p) {
+            while (*p == ' ' || *p == '\t')
+                p++;
+            if (!*p)
+                break;
+
+            bool quoted = (*p == '"');
+            if (quoted)
+                p++;
+            const char* start = p;
+            if (quoted) {
+                while (*p && *p != '"')
+                    p++;
+            } else {
+                while (*p && *p != ' ' && *p != '\t')
+                    p++;
+            }
+
+            size_t len = (size_t)(p - start);
+            if (len == 4) {
+                bool match = true;
+                const char* pat = "-ffi";
+                for (size_t i = 0; i < 4; i++) {
+                    char c = start[i];
+                    if (c >= 'A' && c <= 'Z')
+                        c = (char)(c - 'A' + 'a');
+                    if (c != pat[i]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) {
+                    found = true;
+                    break;
+                }
+            }
+            if (quoted && *p == '"')
+                p++;
+        }
+    #else
+        FILE* f = fopen("/proc/self/cmdline", "rb");
+        if (f) {
+            std::string args;
+            char buf[4096];
+            size_t n;
+            while ((n = fread(buf, 1, sizeof(buf), f)) > 0)
+                args.append(buf, n);
+            fclose(f);
+
+            size_t pos = 0;
+            while (pos < args.size()) {
+                size_t end = args.find('\0', pos);
+                if (end == std::string::npos)
+                    end = args.size();
+                if (end - pos == 4 && args.compare(pos, 4, "-ffi") == 0) {
+                    found = true;
+                    break;
+                }
+                pos = end + 1;
+            }
+        }
+    #endif
+
+    enabled = found ? 1 : 0;
+    std::cout << "[LJPatch] FFI: " << (found ? "enabled (-ffi)" : "disabled (pass -ffi to enable)") << std::endl;
+    return found;
+}
+
 namespace Framework {
     typedef void* (*CreateInterface_fn)(const char* name, int* returncode);
 
@@ -457,10 +535,33 @@ namespace Overrides {
     {
         luaL_openlibs(L);
 
-        lua_pushcfunction(L, luaopen_ffi);
-        lua_pushstring(L, LUA_FFILIBNAME);
-        lua_call(L, 1, 1);
-        lua_setfield(L, LUA_GLOBALSINDEX, LUA_FFILIBNAME);
+        if (LJPatchFFIEnabled()) {
+            lua_pushcfunction(L, luaopen_ffi);
+            lua_pushstring(L, LUA_FFILIBNAME);
+            lua_call(L, 1, 1);
+            lua_setfield(L, LUA_GLOBALSINDEX, LUA_FFILIBNAME);
+        } else {
+            lua_pushnil(L);
+            lua_setfield(L, LUA_GLOBALSINDEX, LUA_FFILIBNAME);
+
+            lua_getfield(L, LUA_GLOBALSINDEX, "package");
+            if (lua_istable(L, -1)) {
+                lua_getfield(L, -1, "loaded");
+                if (lua_istable(L, -1)) {
+                    lua_pushnil(L);
+                    lua_setfield(L, -2, LUA_FFILIBNAME);
+                }
+                lua_pop(L, 1);
+
+                lua_getfield(L, -1, "preload");
+                if (lua_istable(L, -1)) {
+                    lua_pushnil(L);
+                    lua_setfield(L, -2, LUA_FFILIBNAME);
+                }
+                lua_pop(L, 1);
+            }
+            lua_pop(L, 1);
+        }
 
         lua_getfield(L, LUA_GLOBALSINDEX, "require");
         lua_setfield(L, LUA_GLOBALSINDEX, "acquire");

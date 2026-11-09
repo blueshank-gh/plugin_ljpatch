@@ -121,6 +121,7 @@ local function setup(params)
 
             filter "system:linux"
                 defines { "COMPILER_GCC" }
+                linkoptions { "-Wl,--exclude-libs,libluajit.a" }
 
                 filter { "system:linux", "platforms:x86" }
                     pic "On"
