@@ -531,6 +531,74 @@ LJPatchPlugin::~LJPatchPlugin()
 
 namespace Overrides {
     int lua_resume_real_dt(lua_State* L, int nargs) { return lua_resume(L, nargs); }
+
+    static bool DropLuaGlobal(lua_State* L, const char* name)
+    {
+        lua_getfield(L, LUA_GLOBALSINDEX, name);
+        bool present = !lua_isnil(L, -1);
+        lua_pop(L, 1);
+        lua_pushnil(L);
+        lua_setfield(L, LUA_GLOBALSINDEX, name);
+        return present;
+    }
+
+    static bool DropLuaField(lua_State* L, const char* tableName, const char* field)
+    {
+        bool present = false;
+        lua_getfield(L, LUA_GLOBALSINDEX, tableName);
+        if (lua_istable(L, -1)) {
+            lua_getfield(L, -1, field);
+            present = !lua_isnil(L, -1);
+            lua_pop(L, 1);
+            lua_pushnil(L);
+            lua_setfield(L, -2, field);
+        }
+        lua_pop(L, 1);
+        return present;
+    }
+
+    static bool DropNativeLoaders(lua_State* L)
+    {
+        bool removed = false;
+        lua_getfield(L, LUA_GLOBALSINDEX, "package");
+        if (lua_istable(L, -1)) {
+            lua_getfield(L, -1, "loaders");
+            if (lua_istable(L, -1)) {
+                for (int i = 3; ; ++i) {
+                    lua_rawgeti(L, -1, i);
+                    bool present = !lua_isnil(L, -1);
+                    lua_pop(L, 1);
+                    if (!present)
+                        break;
+                    lua_pushnil(L);
+                    lua_rawseti(L, -2, i);
+                    removed = true;
+                }
+            }
+            lua_pop(L, 1);
+        }
+        lua_pop(L, 1);
+        return removed;
+    }
+
+    static void SanitizeLua(lua_State* L)
+    {
+        bool dropped = false;
+        dropped |= DropLuaGlobal(L, "io");
+        dropped |= DropLuaGlobal(L, "dofile");
+        dropped |= DropLuaField(L, "os", "execute");
+        dropped |= DropLuaField(L, "os", "getenv");
+        dropped |= DropLuaField(L, "os", "remove");
+        dropped |= DropLuaField(L, "os", "rename");
+        dropped |= DropLuaField(L, "os", "tmpname");
+        dropped |= DropLuaField(L, "os", "exit");
+        dropped |= DropLuaField(L, "os", "setlocale");
+        dropped |= DropLuaField(L, "package", "loadlib");
+        dropped |= DropNativeLoaders(L);
+        if (dropped)
+            std::cout << "[LJPatch] [WARNING] Removed unsafe Lua APIs from state" << std::endl;
+    }
+
     void luaL_openlibs_dtr(lua_State* L)
     {
         luaL_openlibs(L);
@@ -582,6 +650,8 @@ namespace Overrides {
         lua_call(L, 1, 1);
         lua_setfield(L, -2, "stat");
         lua_pop(L, 1);
+
+        SanitizeLua(L);
     }
 }
 
