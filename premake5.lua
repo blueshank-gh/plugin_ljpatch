@@ -70,7 +70,7 @@ local function setup(params)
             objdir ("bin-int/%{prj.name}/%{cfg.platform}/%{cfg.buildcfg}")
 
             local sdk = "sdk" .. params.bitness
-            files { "entry_point.cpp", "luajit/src/**.h", "glua/**.h", sdk .. "/**.hpp", sdk .. "/**.h", sdk .. "/**.lib" }
+            files { "entry_point.cpp", "mimic.cpp", "mimic_exports.h", "luajit/src/**.h", "glua/**.h", sdk .. "/**.hpp", sdk .. "/**.h", sdk .. "/**.lib" }
 
             IncludeSDKCommon()
             IncludeSDKTier0()
