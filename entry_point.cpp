@@ -468,6 +468,10 @@ namespace Overrides {
     BEGIN_NOOPT
 
     NOINLINE int luaJIT_setmode_dt(lua_State* L, int idx, int mode) { return luaJIT_setmode(L, idx, mode); }
+    NOINLINE void luaJIT_profile_start_dt(lua_State* L, const char* mode, luaJIT_profile_callback cb, void* data) { return luaJIT_profile_start(L, mode, cb, data); }
+    NOINLINE void luaJIT_profile_stop_dt(lua_State* L) { return luaJIT_profile_stop(L); }
+    NOINLINE const char* luaJIT_profile_dumpstack_dt(lua_State* L, const char* fmt, int depth, size_t* len) { return luaJIT_profile_dumpstack(L, fmt, depth, len); }
+    NOINLINE int lua_resume_real_dt(lua_State* L, int nargs) { return lua_resume(L, nargs); }
 
     NOINLINE int luaopen_base_dt(lua_State* L) { return luaopen_base(L); }
     NOINLINE int luaopen_bit_dt(lua_State* L) { return luaopen_bit(L); }
@@ -649,6 +653,11 @@ namespace Overrides {
         lua_pushstring(L, "jit.util");
         lua_call(L, 1, 1);
         lua_setfield(L, -2, "util");
+
+        lua_getfield(L, LUA_GLOBALSINDEX, "require");
+        lua_pushstring(L, "jit.stat");
+        lua_call(L, 1, 1);
+        lua_setfield(L, -2, "stat");
         lua_pop(L, 1);
     }
 
@@ -697,6 +706,10 @@ namespace LJPatch {
             using namespace Overrides;
 
             add("luaJIT_setmode", (void*)luaJIT_setmode_dt);
+            add("luaJIT_profile_start", (void*)luaJIT_profile_start_dt);
+            add("luaJIT_profile_stop", (void*)luaJIT_profile_stop_dt);
+            add("luaJIT_profile_dumpstack", (void*)luaJIT_profile_dumpstack_dt);
+            add("lua_resume_real", (void*)lua_resume_real_dt);
 
             add("luaopen_base", (void*)luaopen_base_dt);
             add("luaopen_bit", (void*)luaopen_bit_dt);
