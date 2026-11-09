@@ -32,13 +32,11 @@ jobs:
       - name: Install Premake5
         shell: pwsh
         run: |
-          if (-Not (Test-Path premake-core)) {
-            git clone --depth=1 https://github.com/premake/premake-core.git
-          }
-          cd premake-core
-          .\Bootstrap.bat vs2022
-          Move-Item .\bin\release\premake5.exe ..\repository\
-          cd ..
+          $zip = Join-Path $env:RUNNER_TEMP 'premake5.zip'
+          $dir = Join-Path $env:RUNNER_TEMP 'premake5'
+          Invoke-WebRequest -Uri 'https://github.com/premake/premake-core/releases/download/v5.0.0/premake-5.0.0-windows.zip' -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dir -Force
+          Copy-Item (Join-Path $dir 'premake5.exe') repository
 
       - name: Initialize Premake
         shell: pwsh
@@ -88,13 +86,11 @@ jobs:
       - name: Install Premake5
         shell: pwsh
         run: |
-          if (-Not (Test-Path premake-core)) {
-            git clone --depth=1 https://github.com/premake/premake-core.git
-          }
-          cd premake-core
-          .\Bootstrap.bat vs2022
-          Move-Item .\bin\release\premake5.exe ..\repository\
-          cd ..
+          $zip = Join-Path $env:RUNNER_TEMP 'premake5.zip'
+          $dir = Join-Path $env:RUNNER_TEMP 'premake5'
+          Invoke-WebRequest -Uri 'https://github.com/premake/premake-core/releases/download/v5.0.0/premake-5.0.0-windows.zip' -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dir -Force
+          Copy-Item (Join-Path $dir 'premake5.exe') repository
 
       - name: Initialize Premake
         shell: pwsh
@@ -144,13 +140,11 @@ jobs:
       - name: Install Premake5
         shell: pwsh
         run: |
-          if (-Not (Test-Path premake-core)) {
-            git clone --depth=1 https://github.com/premake/premake-core.git
-          }
-          cd premake-core
-          .\Bootstrap.bat vs2022
-          Move-Item .\bin\release\premake5.exe ..\repository\
-          cd ..
+          $zip = Join-Path $env:RUNNER_TEMP 'premake5.zip'
+          $dir = Join-Path $env:RUNNER_TEMP 'premake5'
+          Invoke-WebRequest -Uri 'https://github.com/premake/premake-core/releases/download/v5.0.0/premake-5.0.0-windows.zip' -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dir -Force
+          Copy-Item (Join-Path $dir 'premake5.exe') repository
 
       - name: Initialize Premake
         shell: pwsh
@@ -200,13 +194,11 @@ jobs:
       - name: Install Premake5
         shell: pwsh
         run: |
-          if (-Not (Test-Path premake-core)) {
-            git clone --depth=1 https://github.com/premake/premake-core.git
-          }
-          cd premake-core
-          .\Bootstrap.bat vs2022
-          Move-Item .\bin\release\premake5.exe ..\repository\
-          cd ..
+          $zip = Join-Path $env:RUNNER_TEMP 'premake5.zip'
+          $dir = Join-Path $env:RUNNER_TEMP 'premake5'
+          Invoke-WebRequest -Uri 'https://github.com/premake/premake-core/releases/download/v5.0.0/premake-5.0.0-windows.zip' -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dir -Force
+          Copy-Item (Join-Path $dir 'premake5.exe') repository
 
       - name: Initialize Premake
         shell: pwsh
